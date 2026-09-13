@@ -1,0 +1,57 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+credentials*.json
+
+# Node / WXT
+node_modules/
+.wxt/
+.output/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Local data and model binaries; preserve directory placeholders
+/data/**
+!/data/.gitkeep
+/artifacts/**
+!/artifacts/.gitkeep
+*.joblib
+*.pkl
+*.pickle
+*.onnx
+*.pt
+*.pth
+*.safetensors
+
+# Local logs, browser profiles, backups, and editor state
+*.log
+.codex-backups/
+tmp/
+.temp/
+playwright-report/
+test-results/
+browser-profile/
+chrome-profile/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
