@@ -1,0 +1,308 @@
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --border: #e5e5e8;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-text: #ffffff;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --warn: #f59e0b;
+  --warn-bg: #fffbeb;
+  --safe: #16a34a;
+  --safe-bg: #f0fdf4;
+  --chip-bg: #f4f4f5;
+  --chip-text: #3f3f46;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18181b;
+    --surface: #232326;
+    --border: #33333a;
+    --text: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --primary: #3b82f6;
+    --primary-hover: #60a5fa;
+    --primary-text: #ffffff;
+    --danger: #f87171;
+    --danger-bg: #2a1515;
+    --warn: #fbbf24;
+    --warn-bg: #2a2110;
+    --safe: #4ade80;
+    --safe-bg: #12241a;
+    --chip-bg: #2c2c30;
+    --chip-text: #d4d4d8;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 340px;
+  margin: 0;
+  padding: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.app-header .icon {
+  font-size: 18px;
+}
+
+.app-header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.state-icon {
+  font-size: 24px;
+}
+
+.article-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.article-preview {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.article-meta {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 9px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--chip-bg);
+  color: var(--text);
+  margin-top: 10px;
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+#analyze-result {
+  margin-top: 12px;
+}
+
+.result-card {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.score-badge {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.score-badge.level-safe {
+  background: var(--safe-bg);
+  color: var(--safe);
+}
+
+.score-badge.level-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.score-badge.level-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.score-info .score-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.score-info .score-label.level-safe {
+  color: var(--safe);
+}
+
+.score-info .score-label.level-warn {
+  color: var(--warn);
+}
+
+.score-info .score-label.level-danger {
+  color: var(--danger);
+}
+
+.score-info .score-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.similarity-row {
+  margin-bottom: 12px;
+}
+
+.similarity-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.similarity-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  overflow: hidden;
+}
+
+.similarity-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.evidence-block {
+  margin-bottom: 12px;
+}
+
+.evidence-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+.evidence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.explanation {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--chip-bg);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.mock-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.error-text {
+  color: var(--danger);
+  margin: 0 0 4px;
+  font-size: 13px;
+}
