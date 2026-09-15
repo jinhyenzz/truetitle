@@ -66,3 +66,44 @@ popup (사용자 클릭)
   → 결과를 popup으로 돌려받아 화면 표시
   → 분석하기 클릭 시 analyzeApi (지금은 mock) 호출
 ```
+
+---
+
+## 2차 작업 - 실제 서버 연결 (2026-09-16)
+
+### 한 일
+
+1. **`services/api/app/main.py` 추가**
+   - 그동안 없던 FastAPI 서버 진입점 생성. 기존 `app/api/analyze.py`의 `router`를 등록함.
+   - `/health`: 서버가 떠 있는지만 확인.
+   - `/ready`: 저장된 모델을 실제로 불러올 수 있는지 확인 후 200/503 반환.
+
+2. **`analyzeApi.ts`의 mock 제거, 진짜 서버 호출로 교체**
+   - 기존엔 1초 기다렸다가 랜덤 점수를 돌려주는 가짜 함수였음.
+   - 이제 `.env`의 `WXT_API_BASE_URL`(없으면 `http://127.0.0.1:8001` 기본값)로 실제 FastAPI 서버에 `fetch`로 `{title, body}`를 보내고, 응답을 그대로 화면에 반영.
+   - 주소를 코드에 하드코딩하지 않고 `.env`/`.env.example`로 뺌 → 나중에 배포 주소 바뀌어도 코드 수정 없이 `.env`만 고치면 됨.
+
+3. **`shared/types.ts`의 `AnalyzeResult` 확장**
+   - 서버가 실제로 주는 필드(`classification`, `titleBodySimilarity`, `evidence`)를 타입에 추가.
+
+4. **`popup/main.ts` 결과 화면 갱신**
+   - 낚시성 점수 외에 제목·본문 유사도(%), 본문에 없는 제목 표현(근거)도 같이 표시하도록 수정.
+
+5. **`wxt.config.ts`에 로컬 서버 접근 권한 추가**
+   - `.env`에서 `WXT_API_BASE_URL`을 읽어(없으면 기본값) `host_permissions`에 자동으로 추가하도록 수정. 이게 없으면 popup이 로컬 서버로 fetch를 못 함(권한 오류).
+
+6. **`@types/chrome` 설치**
+   - devDependencies에 추가해서 `chrome.*` API 관련 타입 에러 해결.
+
+### 실제 확인한 것
+
+- `npm run build`로 프로덕션 빌드 성공, `manifest.json`에 새 권한 반영 확인.
+- 실제 크롬에 `.output/chrome-mv3` 압축해제 로드 → 네이버 기사 페이지에서 아이콘 클릭 → 추출 → "분석하기" 클릭까지 전체 흐름을 눈으로 확인.
+- 개발자 도구 Network 탭에서 `/analyze` 요청이 진짜로 서버에 도달해 **503**(모델 파일 없음) 응답을 받는 것까지 확인함. 즉 "네트워크 연결 실패"가 아니라 "서버는 받았는데 모델이 없어서 정직하게 실패 응답"인 상태 — 배선 자체는 정상.
+
+### 알아둘 것 / 남은 일
+
+- **모델 파일 없음**: `artifacts/baseline-full/tfidf_logistic_regression.joblib`이 이 컴퓨터엔 없어서(Git 제외 대상) 아직 진짜 낚시성 점수는 못 봄. `/ready`, `/analyze` 모두 503을 반환하는 게 정상이며, 이 파일이 생기기 전까진 계속 이럴 것.
+- **포트 8000 → 8001로 변경**: 이 컴퓨터에서 Windows가 8000번 포트를 예약된 범위로 잡고 있어서(`WinError 10013`) 8001번으로 서버를 띄움. `analyzeApi.ts`의 `API_BASE_URL`과 `wxt.config.ts`의 `host_permissions`가 둘 다 8001로 맞춰져 있음. 나중에 다른 포트나 실제 배포 주소로 바뀌면 이 두 곳을 같이 고쳐야 함.
+- **`app/main.py`는 정적 빌드(`chrome-mv3`)로만 테스트함**: `chrome-mv3-dev` 폴더는 `npm run dev` 서버가 켜져 있어야 동작하는 별개의 빌드라 헷갈리지 않도록 주의.
+- **API 주소는 `.env`로 관리**: 실제 값은 `apps/extension/.env`(Git 제외)에 두고, `.env.example`만 커밋함. 새로 셋업할 때는 `.env.example`을 복사해서 `.env` 만들면 됨.

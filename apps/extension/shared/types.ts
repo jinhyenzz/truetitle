@@ -12,6 +12,9 @@ export interface AnalyzeRequest {
 
 export interface AnalyzeResult {
   clickbaitScore: number;
+  classification: 'clickbait' | 'non_clickbait';
+  titleBodySimilarity: number;
+  evidence: string[];
   explanation: string;
   isMock: boolean;
 }
