@@ -1,5 +1,14 @@
 # 작업 변경 기록
 
+## 2026-09-15 - 제목·본문 표현 유사도 응답 추가
+
+- 요청 및 승인: 사용자가 제목과 본문의 유사도를 별도 신호로 제공하는 다음 단계를 진행하도록 승인함. 사전 실험에서 같은 본문에 원래 불일치 제목을 사용했을 때 0.5%, 본문과 맞춘 비교 제목을 사용했을 때 37.0%가 확인되어, 낚시성 분류 점수와 섞지 않고 API의 보조 응답 필드로만 추가함.
+- 백업: `services/api/app/ml/predictor.py`, `services/api/app/schemas/analysis.py`, `services/api/app/api/analyze.py`, `services/api/tests/test_predictor.py`, `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260915-225656/`에 원래 경로로 복사하고 SHA-256 일치를 확인함.
+- 수정 파일: `app/ml/predictor.py`가 저장된 TF-IDF 변환기로 제목과 본문을 각각 벡터화한 뒤, 두 벡터의 코사인 유사도(0~100)를 계산해 기존 점수·분류·표현 목록과 함께 반환하도록 변경함. 새 의존성은 추가하지 않음. `app/schemas/analysis.py`에 0~100 범위의 `title_body_similarity` 응답 필드를 추가했고, `app/api/analyze.py`는 이를 POST `/analyze` 성공 응답에 포함함. `services/api/tests/test_predictor.py`에는 관련 문장이 무관한 문장보다 더 높은 유사도를 받는 최소 검사를 추가함.
+- 이유와 영향: `clickbait_score`는 기존 분류 모델 확률이고, `title_body_similarity`는 제목과 본문의 표면 표현이 얼마나 겹치는지 보는 독립 보조 지표다. 유사도를 분류 기준이나 기사 진위 판정에 반영하지 않으므로 기존 낚시성 점수·분류 기준은 변하지 않는다. `evidence`의 정확한 표현 부재 목록도 그대로 유지한다. B 담당 `app/main.py`와 확장프로그램 파일은 수정하지 않음.
+- 검증: `.venv` 환경에서 `python -m compileall -q services/api/app services/api/tests`를 통과했고, `python -m unittest discover -s services/api/tests -p test_predictor.py`로 2개 검사를 통과함. 실제 `artifacts/baseline-full` 모델로 `analyze()`를 직접 호출해 응답에 0~100 범위의 `title_body_similarity`가 포함되는 것을 확인함. 같은 짧은 본문에서 불일치 제목은 0.3%, 본문과 맞춘 제목은 51.0%로 반환됨. `git diff --check`도 오류 없이 통과함(LF/CRLF 경고만 출력). FastAPI 서버·실제 HTTP 요청·B 라우터 등록·확장프로그램 표시는 아직 검증하지 않음. Git commit·push·병합도 수행하지 않음.
+- 원상복구: 별도 승인 후 `.codex-backups/20260915-225656/`의 파일을 원래 위치로 복원하면 이 변경 전 상태로 돌아갈 수 있음. 모델과 원본 데이터는 변경하지 않음.
+
 ## 2026-09-15 - 제목·본문 표현 비교 근거 추가
 
 - 요청 및 승인: 사용자가 분석 결과에 판단 근거를 추가하는 다음 단계를 진행하도록 승인함. 현재 모델의 내부 문자 n-gram 기여도를 노출하면 단어 조각이 사용자 화면에 표시되는 것을 확인해, 모델 점수와 분리된 제목·본문의 정확한 표현 비교 신호를 최소 구현으로 추가함.

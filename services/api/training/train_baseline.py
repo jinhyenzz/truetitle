@@ -24,14 +24,28 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INPUT_DIR = PROJECT_ROOT / "data" / "processed" / "part1_body_disjoint"
 DEFAULT_ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "baseline"
 LABEL_NAMES = {0: "clickbait", 1: "non_clickbait"}
+INPUT_DESCRIPTIONS = {
+    "title": "가공 제목(newTitle)",
+    "title_body": "가공 제목(newTitle) + 본문(newsContent)",
+}
 
 
-def article_text(article: dict[str, Any]) -> str:
-    """제목과 본문 경계를 남긴 하나의 모델 입력 문자열을 만든다."""
+def article_text(
+    article: dict[str, Any],
+    input_mode: str = "title_body",
+) -> str:
+    """설정에 따라 제목 또는 제목과 본문을 모델 입력 문자열로 만든다."""
+    if input_mode == "title":
+        return article["title"]
+
     return f"[제목] {article['title']} [본문] {article['body']}"
 
 
-def load_examples(path: Path, limit: int | None) -> tuple[list[str], list[int]]:
+def load_examples(
+    path: Path,
+    limit: int | None,
+    input_mode: str = "title_body",
+) -> tuple[list[str], list[int]]:
     """JSONL을 읽어 텍스트와 라벨을 반환한다.
 
     limit을 주면 전체 파일에서 라벨별 reservoir sampling을 수행한다.
@@ -62,17 +76,17 @@ def load_examples(path: Path, limit: int | None) -> tuple[list[str], list[int]]:
                 raise ValueError(f"{path.name}:{line_number} 라벨이 올바르지 않습니다: {label!r}")
             counts[label] += 1
             if quotas is None:
-                texts.append(article_text(article))
+                texts.append(article_text(article, input_mode))
                 labels.append(label)
                 continue
 
             reservoir = reservoirs[label]
             if len(reservoir) < quotas[label]:
-                reservoir.append(article_text(article))
+                reservoir.append(article_text(article, input_mode))
             else:
                 replacement = rng.randrange(counts[label])
                 if replacement < quotas[label]:
-                    reservoir[replacement] = article_text(article)
+                    reservoir[replacement] = article_text(article, input_mode)
 
     if quotas is not None:
         for label in LABEL_NAMES:
@@ -110,6 +124,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="빠른 확인용 검증 건수 상한. 생략하면 전체를 사용",
     )
+    parser.add_argument(
+        "--input-mode",
+        choices=("title_body", "title"),
+        default="title_body",
+        help="모델 입력으로 제목과 본문을 함께 쓸지, 제목만 쓸지 선택",
+    )
     return parser.parse_args()
 
 
@@ -126,10 +146,10 @@ def main() -> None:
         raise FileExistsError(f"기존 학습 결과를 덮어쓰지 않습니다: {artifact_dir}")
 
     train_texts, train_labels = load_examples(
-        input_dir / "part1_train.jsonl", args.max_train_samples
+        input_dir / "part1_train.jsonl", args.max_train_samples, args.input_mode,
     )
     validation_texts, validation_labels = load_examples(
-        input_dir / "part1_validation.jsonl", args.max_validation_samples
+        input_dir / "part1_validation.jsonl", args.max_validation_samples, args.input_mode,
     )
     print(f"학습: {len(train_labels):,}건 / {dict(Counter(train_labels))}")
     print(f"검증: {len(validation_labels):,}건 / {dict(Counter(validation_labels))}")
@@ -161,7 +181,8 @@ def main() -> None:
     dump(model, artifact_dir / "tfidf_logistic_regression.joblib")
     metrics = {
         "dataset": "AI Hub 낚시성 기사 탐지 데이터 Part1",
-        "input": "가공 제목(newTitle) + 본문(newsContent)",
+        "input": INPUT_DESCRIPTIONS[args.input_mode],
+        "input_mode": args.input_mode,
         "label_meaning": {str(key): value for key, value in LABEL_NAMES.items()},
         "train_samples": len(train_labels),
         "validation_samples": len(validation_labels),

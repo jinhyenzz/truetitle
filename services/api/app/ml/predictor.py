@@ -9,10 +9,10 @@ import joblib
 MODEL_PATH = (
     Path(__file__).resolve().parents[4]
     / "artifacts"
-    / "baseline-20k-stratified"
+    / "baseline-full"
     / "tfidf_logistic_regression.joblib"
 )
-MODEL_NAME = "tfidf-logistic-regression-20k"
+MODEL_NAME = "tfidf-logistic-regression-full"
 WORD_PATTERN = re.compile(r"[가-힣A-Za-z0-9]{2,}")
 MAX_EVIDENCE_TERMS = 3
 
@@ -48,9 +48,16 @@ def find_title_terms_not_in_body(title: str, body: str) -> list[str]:
     return evidence
 
 
+def calculate_title_body_similarity(model, title: str, body: str) -> float:
+    vectorizer = model.named_steps["tfidf"]
+    title_vector, body_vector = vectorizer.transform([title, body])
+    similarity = title_vector.multiply(body_vector).sum()
+    return round(float(similarity) * 100, 1)
+
+
 def analyze_article(
     title: str, body: str
-) -> tuple[float, Literal["clickbait", "non_clickbait"], list[str]]:
+) -> tuple[float, Literal["clickbait", "non_clickbait"], float, list[str]]:
     model = load_model()
     text = f"[제목] {title} [본문] {body}"
     classes = model.named_steps["classifier"].classes_
@@ -58,4 +65,5 @@ def analyze_article(
     clickbait_probability = dict(zip(classes, probabilities))[0]
     score = round(float(clickbait_probability) * 100, 1)
     classification = "clickbait" if score >= 50 else "non_clickbait"
-    return score, classification, find_title_terms_not_in_body(title, body)
+    similarity = calculate_title_body_similarity(model, title, body)
+    return score, classification, similarity, find_title_terms_not_in_body(title, body)
