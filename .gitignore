@@ -56,3 +56,7 @@ chrome-profile/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Runtime model used by the analysis API
+!/artifacts/baseline-full/
+!/artifacts/baseline-full/tfidf_logistic_regression.joblib
