@@ -198,19 +198,42 @@ body {
   font-weight: 700;
 }
 
-.score-badge.level-safe {
-  background: var(--safe-bg);
-  color: var(--safe);
+/* 5단계 낚시성 신호 색상 (1=매우 낮음 ~ 5=매우 높음) */
+.score-badge.sig-1,
+.score-info .score-label.sig-1 {
+  color: #16a34a;
+}
+.score-badge.sig-2,
+.score-info .score-label.sig-2 {
+  color: #84cc16;
+}
+.score-badge.sig-3,
+.score-info .score-label.sig-3 {
+  color: #f59e0b;
+}
+.score-badge.sig-4,
+.score-info .score-label.sig-4 {
+  color: #f97316;
+}
+.score-badge.sig-5,
+.score-info .score-label.sig-5 {
+  color: #ef4444;
 }
 
-.score-badge.level-warn {
-  background: var(--warn-bg);
-  color: var(--warn);
+.score-badge.sig-1 {
+  background: color-mix(in srgb, #16a34a 15%, transparent);
 }
-
-.score-badge.level-danger {
-  background: var(--danger-bg);
-  color: var(--danger);
+.score-badge.sig-2 {
+  background: color-mix(in srgb, #84cc16 15%, transparent);
+}
+.score-badge.sig-3 {
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+}
+.score-badge.sig-4 {
+  background: color-mix(in srgb, #f97316 15%, transparent);
+}
+.score-badge.sig-5 {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
 }
 
 .score-info .score-label {
@@ -219,21 +242,38 @@ body {
   margin-bottom: 2px;
 }
 
-.score-info .score-label.level-safe {
-  color: var(--safe);
-}
-
-.score-info .score-label.level-warn {
-  color: var(--warn);
-}
-
-.score-info .score-label.level-danger {
-  color: var(--danger);
-}
-
 .score-info .score-sub {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.level-meter {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+
+.level-dot {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+}
+
+.level-dot.filled.sig-1 {
+  background: #16a34a;
+}
+.level-dot.filled.sig-2 {
+  background: #84cc16;
+}
+.level-dot.filled.sig-3 {
+  background: #f59e0b;
+}
+.level-dot.filled.sig-4 {
+  background: #f97316;
+}
+.level-dot.filled.sig-5 {
+  background: #ef4444;
 }
 
 .similarity-row {
@@ -305,4 +345,55 @@ body {
   color: var(--danger);
   margin: 0 0 4px;
   font-size: 13px;
+}
+
+.settings-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  cursor: pointer;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--text);
+}
+
+.consent-text {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.disabled-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
 }
