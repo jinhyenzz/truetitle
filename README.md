@@ -2,7 +2,7 @@
 
 한국어 뉴스 기사에 진입한 뒤 제목과 본문을 분석해 낚시성·과장·제목과 본문의 불일치 신호를 보여 주는, 로그인 없는 PC Chrome 확장프로그램입니다.
 
-> 현재 상태: Git 저장소·기본 폴더·정식 학습 데이터가 준비됐고, Part1 데이터 전처리 코드를 작성 중입니다. 모델·API·확장프로그램·배포는 아직 완료되지 않았습니다.
+> 현재 상태: KLUE RoBERTa 제목·본문 모델, FastAPI 분석 API, 네이버 뉴스용 Chrome 확장프로그램 연결을 구현했습니다. 로컬에서 실행·검증 중이며 외부 배포는 아직 하지 않았습니다.
 > 낚시성 분류는 기사의 사실 여부 검증이 아닙니다. 낮은 점수를 안전한 기사라는 뜻으로 표시하지 않습니다.
 
 ## 개발 범위
@@ -18,11 +18,11 @@
 
 - 확장프로그램: WXT, React, TypeScript, Manifest V3
 - 분석 서버: Python, FastAPI, Pydantic
-- 학습: 표준 Python 전처리, scikit-learn 베이스라인, 한국어 사전학습 모델 비교
+- 학습: 표준 Python 전처리, scikit-learn 베이스라인, KLUE RoBERTa 제목·본문 모델 비교
 - 테스트: Vitest, pytest, 실제 Chrome 확인
 - 배포: 분석 API용 Docker. 제공업체와 비용은 미정.
 
-아직 설치하지 않았습니다. 버전과 실제 실행 명령은 첫 실행 뼈대를 만들 때 확인하고 기록합니다.
+실제 API 환경은 Python 3.14, FastAPI, PyTorch 2.14, Transformers 5.17을 사용합니다.
 
 ## 역할
 
@@ -60,13 +60,27 @@ docs/                     # 계약·설계·작업 기록
 
 `.gitkeep`은 Git이 빈 폴더도 전달할 수 있도록 둔 표식입니다. 실행 코드가 아닙니다.
 
-## 시작 순서
+## 로컬 실행
 
-1. GitHub에 비공개 truetitle 저장소를 만들고 친구를 초대합니다. Git 연결은 사용자가 직접 진행합니다.
-2. 진현은 `services/api/training/prepare_part1.py`로 정식 Part1 데이터를 학습·검증 JSONL로 변환합니다.
-3. 박소현은 WXT 기반 확장프로그램에서 기사 제목·본문 추출과 개발용 mock 결과 화면을 구현합니다.
-4. 모델·API와 확장프로그램의 실제 연결 전 요청·응답 형식을 합의하고, 동의·OFF 상태 전송 차단을 확인합니다.
-5. 베이스라인 평가, API 연결, 실제 브라우저 검증, README·시연 자료 정리 순으로 진행합니다.
+GitHub Desktop으로 저장소를 복제하면 Git LFS가 5만 건 학습 모델을 함께 받습니다. 모델 폴더가 비어 있으면 프로젝트 루트에서 `git lfs pull`을 실행합니다.
+
+API는 프로젝트 루트에서 아래 순서로 실행합니다.
+
+```powershell
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r .\services\api\requirements.txt
+.\.venv\Scripts\python.exe -X utf8 -m uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8001
+```
+
+확장 프로그램은 별도 터미널에서 실행합니다.
+
+```powershell
+cd apps/extension
+npm install
+npm run dev
+```
+
+API 서버가 실행된 상태에서 네이버 뉴스 일반 기사에 들어가 확장 프로그램 팝업의 `분석하기`를 누르면 됩니다.
 
 ## 협업
 

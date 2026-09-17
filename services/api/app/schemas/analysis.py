@@ -12,6 +12,8 @@ class AnalyzeRequest(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     clickbait_score: float = Field(ge=0, le=100)
+    clickbait_signal_level: Literal[1, 2, 3, 4, 5]
+    clickbait_signal_label: str
     classification: Literal["clickbait", "non_clickbait"]
     title_body_similarity: float = Field(ge=0, le=100)
     evidence: list[str] = Field(default_factory=list, max_length=3)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from app.ml.predictor import MODEL_NAME, ModelUnavailableError, analyze_article
+from app.ml.predictor import MODEL_NAME, ModelUnavailableError, analyze_article, score_to_signal_level
 from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse
 
 
@@ -16,8 +16,12 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     except ModelUnavailableError as error:
         raise HTTPException(status_code=503, detail="분석 모델을 준비하지 못했습니다.") from error
 
+    signal_level, signal_label = score_to_signal_level(score)
+
     return AnalyzeResponse(
         clickbait_score=score,
+        clickbait_signal_level=signal_level,
+        clickbait_signal_label=signal_label,
         classification=classification,
         title_body_similarity=similarity,
         evidence=evidence,

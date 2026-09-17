@@ -1,5 +1,48 @@
 # 작업 변경 기록
 
+## 2026-09-17 - 5만 건 Transformer 모델을 기본 실행 모델로 교체하고 Git LFS 배포 준비
+
+- 요청 및 승인: 사용자가 사람 평가 전에 5만 건 학습 모델을 사용하고, 소현이가 저장소를 받은 뒤 실행할 수 있게 준비하도록 요청함.
+- 백업: 수정 전 `services/api/app/ml/predictor.py`, `services/api/tests/test_main.py`, `.gitignore`, `.gitattributes`, `README.md`, `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260917-150000/`에 원래 상대 경로로 복사하고 SHA-256 일치를 확인함.
+- 수정 파일: `predictor.py`의 기본 모델 경로를 `artifacts/transformer-10000-v1`에서 `artifacts/transformer-50000-v1`로 변경함. `.gitignore`는 5만 건 모델 폴더만 예외 처리했고, `.gitattributes`는 272,382,200바이트 `model.safetensors`만 Git LFS로 추적하도록 추가함. README에는 현재 구현 상태와 Git LFS를 포함한 로컬 API·확장 프로그램 실행 방법을 갱신함.
+- 이유와 영향: 동일한 AI Hub 검증 5,000건에서 5만 건 모델의 정확도·Macro F1이 1만 건 모델보다 높았고(0.9606 대 0.9496), GitHub 일반 파일 제한 100MB를 넘는 실행 모델을 Git LFS로 전달할 수 있게 함. GitHub Desktop으로 LFS 지원 복제본을 받으면 소현이도 같은 모델을 내려받아 API를 실행할 수 있음.
+- 검증: API 가상환경에서 `python -m unittest discover -s services/api/tests -p 'test_*.py' -v`를 실행해 12개 검사를 통과했고, 실제 `transformer-50000-v1` 가중치를 불러온 `/analyze` 검사도 통과함. `git check-attr`로 큰 가중치 파일의 LFS filter/diff/merge 속성을 확인했고, `git status --untracked-files=all`에서 5만 건 모델 폴더 다섯 파일이 추적 후보로 표시됨을 확인함. 1만 건 모델은 계속 ignore됨. 확장 프로그램의 `npm run compile` TypeScript 검사도 통과했고, `git diff --check`는 다음 확인 대상으로 남김.
+- 미검증: 새 모델의 두 사람 실제 기사 합의 라벨 성능, Git LFS 모델의 원격 push·동료 복제, 새 5단계 응답을 사용한 확장 프로그램 화면은 아직 수행하지 않음. Git commit·push·PR·병합은 수행하지 않음.
+- 원상복구: 별도 승인 후 `.codex-backups/20260917-150000/`의 파일을 원래 위치로 복원하면 1만 건 모델과 이전 Git 제외 설정으로 돌아감. Git LFS로 원격에 push한 모델 객체 삭제는 별도 원격 정리 작업이 필요함.
+
+## 2026-09-17 - 분석 결과의 5단계 낚시성 신호 추가
+
+- 요청 및 승인: 사용자가 점수만 표시하지 않고 확장 프로그램에서 5단계로 표현하기를 요청했고, 소현이의 사람 평가를 기다리는 동안 API에서 먼저 사용할 수 있는 형태로 준비하도록 요청함.
+- 백업: 수정 전 `services/api/app/ml/predictor.py`, `services/api/app/api/analyze.py`, `services/api/app/schemas/analysis.py`, `services/api/tests/test_predictor.py`, `services/api/tests/test_main.py`, `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260917-144500/`에 원래 상대 경로로 복사하고 SHA-256 일치를 확인함.
+- 수정 파일: `predictor.py`에 점수 구간을 1~5단계와 한국어 표시 문구로 변환하는 순수 함수를 추가함. `/analyze` 성공 응답에 `clickbait_signal_level`(1~5)과 `clickbait_signal_label`을 추가했고, 응답 스키마와 경계값·실제 API 응답 검사를 갱신함.
+- 구간: 0~19.9점은 1단계(매우 낮음), 20~39.9점은 2단계(낮음), 40~59.9점은 3단계(확인 권장), 60~79.9점은 4단계(높음), 80~100점은 5단계(매우 높음)임.
+- 이유와 영향: 이 단계는 기존 모델 점수를 사람이 읽기 쉽게 표현하는 보조 정보이며, 기사 진위 판정이나 보정된 확률이 아님. 기존 `clickbait_score`, 이진 `classification`, 제목·본문 유사도와 근거 목록은 변경하지 않아 현재 확장 프로그램도 계속 동작함. 소현이는 이후 선택적으로 새 필드를 사용해 현재 3단계 화면을 5단계로 바꿀 수 있음.
+- 검증: API 가상환경에서 `python -m unittest discover -s services/api/tests -p 'test_*.py' -v`를 실행해 12개 검사를 통과함. 실제 `transformer-10000-v1` 모델을 불러온 `/analyze` 검사에서 새 5단계 필드도 포함됨을 확인함. 확장 프로그램의 `npm run compile` TypeScript 검사를 통과했고, `git diff --check`는 다음 확인 대상으로 남김.
+- 미검증: 사람 평가 기반의 점수 구간 보정, 새 응답 필드를 사용한 확장 프로그램 5단계 표시, Git commit·push·PR·병합은 아직 수행하지 않음.
+- 원상복구: 별도 승인 후 `.codex-backups/20260917-144500/`의 파일을 원래 위치로 복원하면 됨.
+
+## 2026-09-17 - 5만 건 Transformer 비교 및 API 통합 검사 복구
+
+- 요청 및 승인: 사용자가 소현이의 실제 기사 평가를 기다리는 동안 AI가 독립적으로 처리할 수 있는 다음 작업을 진행하도록 요청함. 사용자가 5만 건·3에포크 Transformer 학습을 완료한 뒤, 기존 1만 건 모델과 같은 기사로 비교함.
+- 백업: 수정 전 `services/api/tests/test_main.py`, `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260917-143000/`에 원래 상대 경로로 복사하고 SHA-256 일치를 확인함.
+- 수정 파일: `services/api/tests/test_main.py`의 실제 모델 API 검사 조건을 `MODEL_PATH.is_file()`에서 `MODEL_PATH.is_dir()`로 수정함. 현재 Transformer는 단일 모델 파일이 아니라 모델·토크나이저 파일을 담은 폴더이므로, 기존 조건에서는 실제 모델이 있어도 검사가 생략됐음. API 동작이나 모델 경로는 변경하지 않음.
+- 학습 결과: 사용자가 `transformer-50000-v1`에 AI Hub Part1 학습 50,000건(라벨별 25,000건), 검증 5,000건(라벨별 2,500건), 최대 128토큰, 배치 8, CPU, 3에포크로 학습을 완료함. 저장된 학습 결과는 정확도 0.9606, Macro F1 0.9605945임.
+- 동일 표본 비교: 고정 시드 42로 선택한 검증 5,000건(라벨별 2,500건)을 두 모델에 동일하게 입력함. 1만 건 모델은 정확도 0.9496, Macro F1 0.9496000, 오답 252건, 혼동행렬 `[[2372, 128], [124, 2376]]`이었고, 5만 건 모델은 정확도 0.9606, Macro F1 0.9605945, 오답 197건, 혼동행렬 `[[2372, 128], [69, 2431]]`이었음. 행은 실제 라벨, 열은 예측 라벨이고 라벨 순서는 [낚시성, 비낚시성]임. 새 모델은 기존 오답 133건을 고치고 새 오답 78건을 만들었으며, 낚시성 기사 미탐지 128건은 같고 비낚시성 기사 오경고가 124건에서 69건으로 감소함.
+- 이유와 영향: 학습 당시 각 모델이 사용한 검증 표본 수가 달라 저장된 metrics.json 수치를 직접 비교하면 안 되므로, 동일 기사 비교 결과를 모델 선택 근거로 기록함. 아직 API는 `transformer-10000-v1`을 사용하며 새 모델로 자동 교체하지 않음.
+- 검증: API 가상환경에서 `python -m unittest discover -s services/api/tests -p 'test_*.py' -v`를 실행해 11개 검사를 통과함. 수정한 실제 모델 검사에서 `transformer-10000-v1` 가중치를 불러와 `/analyze`가 정상 응답함을 확인함. 확장 프로그램에서 `npm run compile`을 실행해 TypeScript 검사도 통과했고, `git diff --check`는 오류 없이 통과함(LF/CRLF 경고만 출력).
+- 미검증: 두 사람의 새 네이버 기사 20건 합의 라벨, 그 라벨에 따른 실제 서비스 성능 비교, 5만 건 모델의 API 교체 및 확장 프로그램 통합 실행은 아직 수행하지 않음. Git commit·push·PR·병합은 수행하지 않음.
+- 원상복구: 별도 승인 후 `.codex-backups/20260917-143000/services/api/tests/test_main.py`와 `docs/CODEX_CHANGELOG.md`를 원래 위치로 복원하면 됨. 5만 건 모델 산출물은 이 변경으로 수정하지 않음.
+
+## 2026-09-16 - 1만 건 Transformer 모델을 분석 API 기본 모델로 교체
+
+- 요청 및 승인: 동일 2,000건 검증에서 1만 건 학습 모델이 기존 2천 건 모델보다 정확도와 Macro F1 모두 높았고(0.9565 대 0.9195), 사용자가 실제 기사 재검증을 위해 API 기본 모델 교체를 승인함.
+- 백업: 수정 전 `services/api/app/ml/predictor.py`와 `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260916-214500/`에 원래 상대 경로로 복사했으며, 각 원본과 백업의 SHA-256 일치를 확인함.
+- 수정 파일: `services/api/app/ml/predictor.py`의 `MODEL_PATH`만 `artifacts/transformer-experiment-2000-v2`에서 `artifacts/transformer-10000-v1`로 변경함. API 요청·응답 형식, 점수 계산, 제목·본문 유사도, 확장프로그램 코드는 변경하지 않음.
+- 이유와 영향: 학습 데이터 10,000건·검증 2,000건 모델을 새 기본 후보로 연결한다. FastAPI 서버는 재시작해야 새 모델을 읽으며, 해당 로컬 모델 폴더가 없으면 준비 상태가 false가 될 수 있다. 모델 파일과 원본 데이터는 Git에 추가하지 않음.
+- 검증: `predictor.py`를 직접 import해 새 `MODEL_PATH`가 `artifacts/transformer-10000-v1`임을 확인함. 서버 재시작 뒤 FastAPI `/ready`가 `ready: true`를 반환했고, 기존 2천 건 모델로 점수를 기록한 실제 네이버 기사 일반 10건·낚시성 의심 10건을 같은 `/analyze` 요청으로 다시 분석함. 동일 AI Hub 검증 2,000건에서는 기존 2천 건 모델보다 정확도·Macro F1이 0.9195에서 0.9565로 높았지만, 실제 의심 기사 중 결론을 숨기는 표현을 낮게 판단한 사례와 사람 3단계 기사를 높게 판단한 사례가 모두 있었음. 따라서 이 20건은 서비스 정확도로 사용하지 않고 후속 사람 평가용 고정 검증 세트로 유지함.
+- 미검증: 이번 경로 변경 뒤 `test_predictor.py` 단위 테스트는 재실행하지 않았음. 사람 2인의 최종 합의 라벨과 합의 라벨 기준의 실제 기사 비교 결과도 아직 확정하지 않음. Git commit·push·PR·병합은 수행하지 않음.
+- 원상복구: 별도 승인 후 `.codex-backups/20260916-214500/services/api/app/ml/predictor.py`를 복원하거나 `MODEL_PATH`를 기존 폴더로 되돌리면 이전 2천 건 모델을 다시 사용함.
+
 ## 2026-09-16 - 실행용 전체 학습 모델 Git 포함
 
 - 요청 및 승인: 사용자가 동료가 main에서 코드를 받을 때 실행용 학습 모델도 함께 받을 수 있도록 Git 제외 설정을 변경하라고 요청함.
@@ -137,3 +180,37 @@
 - 검증: 생성 후 파일 존재, API 이름·상태·JSON 예시·계약 변경 항목을 읽기로 확인. 현재 브랜치는 `feat/model-baseline`, 원격 추적은 `origin/feat/model-baseline`, 작업 시작 전 상태는 깨끗했음.
 - 미검증: API·모델·언어 감지·확장프로그램을 구현하거나 실행하지 않음. Git commit·push·PR·패키지 설치·외부 게시 없음.
 - 원상복구: 별도 승인 후 신규 문서 두 개를 제거하고 이 작업 기록을 백업본으로 복원할 수 있음. 삭제·복원은 실행하지 않음.
+
+## 2026-09-16 - 제목·본문 쌍 Transformer 학습 실험 추가
+
+- 요청 및 승인: 사용자가 제목·본문 관계를 더 잘 다루는 한국어 사전학습 모델 실험을 진행하도록 명시적으로 승인함. 기존 TF-IDF 모델은 유지하고, 성능 비교 후에만 서비스 모델 변경을 검토하기로 함.
+- 백업: 작업 전 `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260916-191055/docs/CODEX_CHANGELOG.md`에 복사하고 SHA-256 일치를 확인함. 학습 중 발견한 호환성 문제를 수정하기 전 `services/api/training/train_transformer.py`도 같은 백업 폴더의 원래 경로에 복사하고 SHA-256 일치를 확인함. 나머지 두 코드는 신규 파일이라 기존 백업 대상이 없음.
+- 수정 파일: `services/api/training/train_transformer.py`를 추가함. `klue/roberta-small`에 가공 제목과 본문을 두 입력으로 전달하고, 제목은 보존하며 긴 본문만 절단한다. 라벨 균형 표본, CPU/CUDA/XPU 장치 선택, 학습·평가·로컬 산출물 저장을 포함한다. `services/api/tests/test_train_transformer.py`를 추가해 두 입력 전달·본문 전용 절단·평가 수치를 확인한다. `services/api/requirements-ml.txt`에 전용 학습 환경의 `torch==2.14.0`, `transformers==5.17.0`을 기록함.
+- 호환성 수정: 첫 소형 학습에서 KLUE RoBERTa가 `token_type_ids`의 값 1을 받을 수 없어 `IndexError`가 발생한 것을 확인함. 두 입력 사이의 구분 토큰은 유지하고 호환되지 않는 보조 필드만 제거하도록 수정한 뒤 재검증함.
+- 이유와 영향: 기존 문자 n-gram TF-IDF는 제목·본문 위치를 바꿔도 특징이 달라지지 않아 둘의 관계를 직접 학습하지 못했음. 새 실험은 분리된 모델·전용 가상환경·Git 제외 산출물을 사용하므로 현재 API, 확장 프로그램, 배포용 TF-IDF 모델에는 영향이 없음.
+- 설치·실행: 프로젝트 루트의 Git 제외 `venv/`에 PyTorch CPU 빌드와 Transformers를 설치함. `klue/roberta-small`을 로컬 Hugging Face 캐시에 내려받음. 64건 학습·32건 검증·1 에포크·CPU·최대 128토큰의 소형 실행을 완료해 `artifacts/transformer-smoke-20260916/`에 모델(약 272MB), 토크나이저, 평가 파일을 생성함.
+- 검증: 새 파일 문법 검사, 새 단위 테스트 2건, 학습 스크립트 `--help`, 소형 실제 학습·모델 저장을 통과함. 소형 실행의 정확도 0.5000, Macro F1 0.3333은 연결 확인용 표본이 너무 작고 1 에포크뿐이어서 성능 지표로 사용하지 않음. `git diff --check`는 통과했고 Git commit·push·PR·병합은 수행하지 않음.
+- 미검증: 더 큰 표본·다중 에포크의 성능 비교, 사람 평가용 실제 기사 시나리오, CPU 학습 시간, Intel XPU 사용, Transformer를 API에 연결하는 작업은 수행하지 않음.
+- 원상복구: 별도 승인 후 새 학습 코드·테스트·의존성 기록을 제거하고 위 백업의 변경 기록과 학습 코드를 복원할 수 있음. `venv/`, Hugging Face 캐시, 소형 모델 산출물 삭제는 별도 승인 없이는 수행하지 않음.
+
+## 2026-09-16 - 동일 검증 표본 모델 비교 추가
+
+- 요청 및 승인: 사용자가 기존 TF-IDF와 Transformer를 동일 검증 표본으로 공정 비교하는 코드를 추가하고 실제 결과까지 확인하도록 승인함.
+- 백업: 수정 전 `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260916-202845/docs/CODEX_CHANGELOG.md`에 복사하고 SHA-256 일치를 확인함. 비교 코드·테스트는 신규 파일이라 기존 백업 대상이 없음.
+- 수정 파일: `services/api/training/compare_models.py`를 추가함. 고정 시드 42로 Part1 검증 데이터의 라벨 균형 500건을 선택하고, `--model baseline` 또는 `--model transformer`로 각 환경에서 예측·정확도·Macro F1·최대 20건의 오답 제목을 JSON 보고서에 저장함. `services/api/tests/test_compare_models.py`를 추가해 이진 분류 지표 계산을 확인함.
+- 이유와 영향: 기존 전체 검증 수치와 500건 Transformer 수치는 직접 비교할 수 없었음. 같은 500건·같은 정답으로 두 모델을 각각 평가하도록 해 모델 선택 근거를 만들었음. 기존 API, 확장 프로그램, 학습 모델, Git 설정에는 영향을 주지 않음.
+- 실행 결과: `artifacts/model-comparison-v1/`에 Git 제외 보고서를 생성함. TF-IDF 전체 학습 모델은 정확도 0.7460, Macro F1 0.7460, 오답 127건이었음. 2,000건 학습 Transformer는 정확도 0.9300, Macro F1 0.9300, 오답 35건이었음. Transformer 학습·검증은 본문 중복이 제거된 Part1 분할을 사용함.
+- 검증: 기존 `.venv`에서 비교 코드 문법 검사·단위 테스트 1건·TF-IDF 실제 500건 평가를 통과함. Transformer 전용 `venv`에서 같은 500건 실제 평가를 통과함. 추가 패키지 설치 없이 각 모델이 이미 사용하는 환경을 분리해 사용함. Git commit·push·PR·병합은 수행하지 않음.
+- 미검증: 다른 무작위 표본·더 큰 검증 표본·최근 실제 네이버 기사에 대한 사람 기준 평가, Transformer API 연결·배포 성능은 아직 확인하지 않음.
+- 원상복구: 별도 승인 후 신규 비교 코드·테스트를 제거하고 위 백업의 변경 기록을 복원할 수 있음. 로컬 비교 보고서 삭제는 별도 승인 없이는 수행하지 않음.
+
+## 2026-09-16 - Transformer 분석 API 연결
+
+- 요청 및 승인: 사용자가 공정 비교 결과 후 다음 단계 진행을 승인했고, 확장 프로그램의 API 응답 형식은 유지한 채 Transformer를 실제 분석 엔진으로 연결함.
+- 백업: 수정 전 `services/api/app/ml/predictor.py`, `services/api/tests/test_predictor.py`, `services/api/requirements.txt`, `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260916-203427/`에 원래 경로대로 복사하고 SHA-256 일치를 확인함.
+- 수정: `predictor.py`가 로컬 `artifacts/transformer-experiment-2000-v2` 모델과 토크나이저를 한 번만 불러와 제목·본문 쌍을 분석하도록 변경함. 기존 `/analyze` 응답의 필드·형식은 유지함. `title_body_similarity`는 기존 TF-IDF 코사인 유사도 대신 제목의 핵심어가 본문에 실제 등장하는 비율로 계산하도록 단순화함. `requirements.txt`에 `torch==2.14.0`, `transformers==5.17.0`을 추가하고 API `.venv`에 설치함. 테스트를 새 유사도 함수 호출 방식에 맞게 갱신함.
+- 이유와 영향: 동일 500건 비교에서 Transformer가 Macro F1 0.9300으로 TF-IDF 0.7460보다 높아, 실제 서비스의 판별 점수를 Transformer로 교체함. 확장 프로그램 호출 주소와 JSON 계약은 바뀌지 않아 소현이의 코드 변경은 필요 없음. API 시작 후 첫 모델 로딩에는 수 초가 걸리고 로컬 Transformer 산출물이 있어야 `/ready`가 true가 됨.
+- 설치 이슈: 첫 패키지 설치 중 Windows 파일 잠금(`WinError 32`)이 발생했으나, 기존 설치 프로세스가 파일 해제를 마친 뒤 `torch=2.14.0+cpu`, `transformers=5.17.0` 정상 import를 확인함.
+- 검증: API 환경에서 단위 테스트 2건 통과. FastAPI TestClient로 `/ready`가 200과 `ready: true`를 반환하고, `/analyze`가 200·점수·분류·유사도·근거·모델명을 포함한 기존 계약 형식의 JSON을 반환함을 확인함. `git diff --check` 통과. TestClient 실행 중 Starlette의 `httpx` 사용 중단 예정 경고는 있었으나 API 응답에는 영향이 없었음. Git commit·push·PR·병합은 수행하지 않음.
+- 미검증: 실제 Chrome 확장 프로그램과 새 API의 통합 실행, 최근 네이버 기사 사람 기준 평가, 모델 산출물 배포·공유 방식은 아직 확인하지 않음.
+- 원상복구: 별도 승인 후 위 백업의 predictor·테스트·requirements·변경 기록을 복원하면 TF-IDF API로 돌아갈 수 있음. PyTorch·Transformers 제거와 모델 파일 삭제는 별도 승인 없이는 수행하지 않음.
