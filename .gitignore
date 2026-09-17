@@ -60,3 +60,5 @@ Desktop.ini
 # Runtime model used by the analysis API
 !/artifacts/baseline-full/
 !/artifacts/baseline-full/tfidf_logistic_regression.joblib
+!/artifacts/transformer-50000-v1/
+!/artifacts/transformer-50000-v1/**

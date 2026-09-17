@@ -54,7 +54,7 @@ class AnalyzeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     @unittest.skipUnless(
-        MODEL_PATH.is_file(), "artifacts/baseline-full 모델 파일이 로컬에 없어 생략"
+        MODEL_PATH.is_dir(), "현재 Transformer 모델 폴더가 로컬에 없어 생략"
     )
     def test_analyze_returns_prediction_when_model_available(self):
         response = client.post(
@@ -70,6 +70,8 @@ class AnalyzeTest(unittest.TestCase):
         self.assertIn(body["classification"], ("clickbait", "non_clickbait"))
         self.assertGreaterEqual(body["clickbait_score"], 0)
         self.assertLessEqual(body["clickbait_score"], 100)
+        self.assertIn(body["clickbait_signal_level"], (1, 2, 3, 4, 5))
+        self.assertTrue(body["clickbait_signal_label"])
 
 
 if __name__ == "__main__":
