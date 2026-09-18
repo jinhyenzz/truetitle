@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import sys
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,65 +15,21 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+# 스크립트로 직접 실행(python train_transformer.py)하든, 테스트에서
+# training.train_transformer로 패키지 임포트하든 training.data/training.metrics를
+# 같은 이름으로 찾을 수 있도록 services/api를 sys.path에 넣어둔다. training/ 자체를
+# 넣고 data/metrics를 상위 없이 바로 import하면 'data'·'metrics'라는 흔한 이름이
+# sys.modules에 등록돼 나중에 같은 이름의 다른 패키지와 충돌할 수 있어 피한다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from training.data import ArticleExample, LABEL_NAMES, load_examples  # noqa: E402
+from training.metrics import calculate_metrics  # noqa: E402
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INPUT_DIR = PROJECT_ROOT / "data" / "processed" / "part1_body_disjoint"
 DEFAULT_ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "transformer-title-body"
 DEFAULT_MODEL_NAME = "klue/roberta-small"
-LABEL_NAMES = {0: "clickbait", 1: "non_clickbait"}
-
-
-@dataclass(frozen=True)
-class ArticleExample:
-    title: str
-    body: str
-    label: int
-
-
-def load_examples(path: Path, limit: int | None) -> list[ArticleExample]:
-    """JSONL을 읽고, 필요하면 라벨 균형을 맞춘 표본만 반환한다."""
-    if not path.is_file():
-        raise FileNotFoundError(f"전처리 결과를 찾을 수 없습니다: {path}")
-    if limit is not None and limit < 2:
-        raise ValueError("limit은 2 이상이어야 합니다.")
-
-    quotas = {0: (limit + 1) // 2, 1: limit // 2} if limit is not None else None
-    reservoirs: dict[int, list[ArticleExample]] = {0: [], 1: []}
-    examples: list[ArticleExample] = []
-    counts: Counter[int] = Counter()
-    rng = random.Random(42)
-
-    with path.open(encoding="utf-8") as input_file:
-        for line_number, line in enumerate(input_file, start=1):
-            article: dict[str, Any] = json.loads(line)
-            title = article.get("title")
-            body = article.get("body")
-            label = article.get("label")
-            if not isinstance(title, str) or not title.strip() or not isinstance(body, str) or not body.strip():
-                raise ValueError(f"{path.name}:{line_number} 제목 또는 본문 형식이 올바르지 않습니다.")
-            if type(label) is not int or label not in LABEL_NAMES:
-                raise ValueError(f"{path.name}:{line_number} 라벨이 올바르지 않습니다: {label!r}")
-
-            example = ArticleExample(title=title, body=body, label=label)
-            counts[label] += 1
-            if quotas is None:
-                examples.append(example)
-                continue
-
-            reservoir = reservoirs[label]
-            if len(reservoir) < quotas[label]:
-                reservoir.append(example)
-                continue
-            replacement = rng.randrange(counts[label])
-            if replacement < quotas[label]:
-                reservoir[replacement] = example
-
-    if quotas is not None:
-        for label in LABEL_NAMES:
-            examples.extend(reservoirs[label])
-    if len({example.label for example in examples}) != 2:
-        raise ValueError(f"{path.name}에서 두 라벨을 모두 읽지 못했습니다: {dict(counts)}")
-    return examples
 
 
 def tokenize_article(tokenizer: Any, title: str, body: str, max_length: int) -> dict[str, torch.Tensor]:
@@ -143,23 +99,6 @@ def train_one_epoch(
         if batch_index % 50 == 0 or batch_index == len(loader):
             print(f"  학습 배치 {batch_index:,}/{len(loader):,}", flush=True)
     return total_loss / len(loader)
-
-
-def calculate_metrics(labels: list[int], predictions: list[int]) -> dict[str, float]:
-    if not labels:
-        raise ValueError("평가할 데이터가 없습니다.")
-    scores: list[float] = []
-    for label in LABEL_NAMES:
-        true_positive = sum(actual == label and predicted == label for actual, predicted in zip(labels, predictions))
-        false_positive = sum(actual != label and predicted == label for actual, predicted in zip(labels, predictions))
-        false_negative = sum(actual == label and predicted != label for actual, predicted in zip(labels, predictions))
-        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive else 0.0
-        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative else 0.0
-        scores.append(2 * precision * recall / (precision + recall) if precision + recall else 0.0)
-    return {
-        "accuracy": sum(actual == predicted for actual, predicted in zip(labels, predictions)) / len(labels),
-        "f1_macro": sum(scores) / len(scores),
-    }
 
 
 def evaluate(

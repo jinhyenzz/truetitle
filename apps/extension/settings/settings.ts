@@ -1,4 +1,4 @@
-import type { Settings } from '@/shared/types';
+import type { AnalyzeErrorInfo, Settings } from '@/shared/types';
 
 // chrome.storage.local에 저장할 때 쓰는 키. 하나의 객체로 묶어서 저장한다.
 const STORAGE_KEY = 'trueTitleSettings';
@@ -41,4 +41,17 @@ export async function resetSettings(): Promise<Settings> {
 // popup과 background 양쪽에서 이 함수 하나로만 판단해서 기준이 어긋나지 않게 한다.
 export function isAnalysisAllowed(settings: Settings): boolean {
   return settings.consented && settings.enabled;
+}
+
+// 분석이 막혀 있다면 그 이유(code+안내 문구)를, 허용되면 null을 돌려준다.
+// isAnalysisAllowed와 같은 기준을 재사용하므로 popup과 background가 서로 다른
+// 문구/코드를 보여주는 일이 없다.
+export function getAnalysisBlockedReason(settings: Settings): AnalyzeErrorInfo | null {
+  if (isAnalysisAllowed(settings)) return null;
+  return {
+    code: settings.consented ? 'DISABLED' : 'NOT_CONSENTED',
+    message: settings.consented
+      ? '분석 기능이 꺼져 있습니다.'
+      : '분석 기능 사용에 먼저 동의해주세요.',
+  };
 }
