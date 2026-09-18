@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.rate_limit import enforce_rate_limit
 from app.ml.predictor import MODEL_NAME, ModelUnavailableError, analyze_article, score_to_signal_level
 from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse
 
@@ -7,7 +8,7 @@ from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse
 router = APIRouter(tags=["analysis"])
 
 
-@router.post("/analyze", response_model=AnalyzeResponse)
+@router.post("/analyze", response_model=AnalyzeResponse, dependencies=[Depends(enforce_rate_limit)])
 def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     try:
         score, classification, similarity, evidence = analyze_article(

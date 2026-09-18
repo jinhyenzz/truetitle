@@ -1,5 +1,5 @@
 import './style.css';
-import { getSettings, resetSettings, setSettings } from '@/settings/settings';
+import { getAnalysisBlockedReason, getSettings, resetSettings, setSettings } from '@/settings/settings';
 import type {
   AnalyzeErrorInfo,
   AnalyzeResult,
@@ -205,14 +205,9 @@ async function handleAnalyze(article: ExtractResult) {
 
   // 버튼이 눌리는 시점 기준으로 한 번 더 확인 (팝업을 열어둔 채로 다른 곳에서 OFF했을 수도 있음).
   const settings = await getSettings();
-  if (!settings.consented || !settings.enabled) {
-    renderAnalyzeError(
-      {
-        code: settings.consented ? 'DISABLED' : 'NOT_CONSENTED',
-        message: settings.consented ? '분석 기능이 꺼져 있습니다.' : '분석 기능 사용에 먼저 동의해주세요.',
-      },
-      article,
-    );
+  const blockedReason = getAnalysisBlockedReason(settings);
+  if (blockedReason) {
+    renderAnalyzeError(blockedReason, article);
     return;
   }
 

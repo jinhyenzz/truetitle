@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { defineConfig } from 'wxt';
+import { NAVER_ARTICLE_MATCH_PATTERN } from './sites/naver';
 
 // wxt.config.ts는 WXT가 .env를 로드하기 전에 평가되므로 여기선 직접 읽는다.
 // analyzeApi.ts의 import.meta.env.WXT_API_BASE_URL과 같은 값을 가리켜야 한다.
@@ -18,6 +19,6 @@ export default defineConfig({
   manifest: {
     name: '낚시성 제목 탐지기',
     permissions: ['activeTab', 'scripting', 'storage'],
-    host_permissions: ['https://n.news.naver.com/*', `${apiBaseUrl}/*`],
+    host_permissions: [NAVER_ARTICLE_MATCH_PATTERN, `${apiBaseUrl}/*`],
   },
 });

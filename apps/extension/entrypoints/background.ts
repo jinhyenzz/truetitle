@@ -1,5 +1,5 @@
 import { AnalyzeApiError, analyzeArticle } from '@/features/explanation/analyzeApi';
-import { getSettings, isAnalysisAllowed } from '@/settings/settings';
+import { getAnalysisBlockedReason, getSettings } from '@/settings/settings';
 import type {
   AnalyzeArticleMessage,
   BackgroundRequestMessage,
@@ -7,7 +7,10 @@ import type {
 } from '@/shared/types';
 
 // 비정상적으로 긴 문자열(예: 오동작으로 페이지 전체가 딸려온 경우)을 그대로 서버로 보내지 않기 위한 상한.
-const MAX_TEXT_LENGTH = 20000;
+// services/api/app/schemas/analysis.py의 AnalyzeRequest(title max_length=300, body max_length=50000)와
+// 반드시 같은 값을 유지해야 한다 (서버가 어차피 거절할 입력을 통과시키지 않기 위함).
+const MAX_TITLE_LENGTH = 300;
+const MAX_BODY_LENGTH = 50_000;
 
 // 외부 웹페이지가 아니라 우리 확장(content script/popup)이 보낸, 우리가 아는 형태의
 // 메시지인지 검증하는 타입가드. 이 검사를 통과 못하면 아예 처리하지 않고 무시한다.
@@ -33,22 +36,15 @@ async function handleAnalyzeArticle(
 ): Promise<BackgroundResponseMessage> {
   // 1) 동의/ON-OFF 확인. 둘 중 하나라도 아니면 서버에 아무것도 보내지 않고 바로 반환.
   const settings = await getSettings();
-  if (!isAnalysisAllowed(settings)) {
-    return {
-      ok: false,
-      error: {
-        code: settings.consented ? 'DISABLED' : 'NOT_CONSENTED',
-        message: settings.consented
-          ? '분석 기능이 꺼져 있습니다.'
-          : '분석 기능 사용에 먼저 동의해주세요.',
-      },
-    };
+  const blockedReason = getAnalysisBlockedReason(settings);
+  if (blockedReason) {
+    return { ok: false, error: blockedReason };
   }
 
   // 2) 입력값 검증 (빈 문자열, 지나치게 긴 문자열 방지).
   const title = message.payload.title.trim();
   const body = message.payload.body.trim();
-  if (!title || !body || title.length > MAX_TEXT_LENGTH || body.length > MAX_TEXT_LENGTH) {
+  if (!title || !body || title.length > MAX_TITLE_LENGTH || body.length > MAX_BODY_LENGTH) {
     return {
       ok: false,
       error: { code: 'INVALID_INPUT', message: '제목 또는 본문을 확인할 수 없습니다.' },
@@ -74,7 +70,13 @@ export default defineBackground(() => {
     if (!isAnalyzeArticleMessage(message)) return undefined; // 모르는 메시지는 무시
 
     const request: BackgroundRequestMessage = message;
-    handleAnalyzeArticle(request).then(sendResponse);
+    handleAnalyzeArticle(request)
+      .then(sendResponse)
+      .catch(() => {
+        // getSettings() 등 try/catch 밖의 호출이 reject해도(예: 확장 컨텍스트 무효화)
+        // sendResponse를 반드시 호출해서 호출자가 무한정 대기하지 않게 한다.
+        sendResponse({ ok: false, error: { code: 'UNKNOWN', message: '알 수 없는 오류가 발생했습니다.' } });
+      });
     return true; // 비동기로 sendResponse를 호출할 것임을 Chrome에 알림
   });
 });
