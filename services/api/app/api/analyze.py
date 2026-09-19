@@ -27,5 +27,5 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         title_body_similarity=similarity,
         evidence=evidence,
         model=MODEL_NAME,
-        note="낚시성 신호와 제목·본문의 표현 유사도·정확한 표현 비교 결과이며 기사 사실 여부를 판정하지 않습니다.",
+        note="이진 분류 점수를 5구간으로 나눈 참고 신호입니다. 표현 유사도는 단어 일치 지표이며, 기사 사실 여부나 과장 심각도를 확정하지 않습니다.",
     )
