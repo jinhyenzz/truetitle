@@ -132,7 +132,7 @@ def score_to_signal_level(score: float) -> tuple[Literal[1, 2, 3, 4, 5], str]:
 
 
 def predict_clickbait_score(title: str, body: str) -> float:
-    tokenizer, model = load_model()
+    tokenizer, model, clickbait_index = load_model()
     encoded = tokenizer(
         title,
         body,
@@ -143,7 +143,7 @@ def predict_clickbait_score(title: str, body: str) -> float:
     )
     encoded.pop("token_type_ids", None)
     with torch.no_grad():
-        clickbait_probability = torch.softmax(model(**encoded).logits, dim=1)[0, 0].item()
+        clickbait_probability = torch.softmax(model(**encoded).logits, dim=1)[0, clickbait_index].item()
     return round(clickbait_probability * 100, 1)
 
 
