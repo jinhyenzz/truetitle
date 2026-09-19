@@ -1,11 +1,15 @@
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+import torch
 
 from app.ml.predictor import (
     analyze_article,
     calculate_title_body_similarity,
     find_title_terms_not_in_body,
     normalize_straight_quotes,
+    predict_clickbait_score,
     score_to_signal_level,
 )
 
@@ -39,6 +43,30 @@ class TitleQuoteNormalizationTest(unittest.TestCase):
             result = analyze_article(title, body)
         predict.assert_called_once_with('정부 “지원 확대” 발표', body)
         self.assertEqual(result[:2], (25.0, "non_clickbait"))
+
+
+class ModelPredictionTest(unittest.TestCase):
+    def test_uses_model_configured_clickbait_index(self):
+        tokenizer = Mock(
+            return_value={
+                "input_ids": torch.tensor([[1, 2]]),
+                "token_type_ids": torch.tensor([[0, 0]]),
+            }
+        )
+        model = Mock(return_value=SimpleNamespace(logits=torch.tensor([[0.0, 2.0]])))
+
+        with patch("app.ml.predictor.load_model", return_value=(tokenizer, model, 1)):
+            score = predict_clickbait_score("제목", "본문")
+
+        self.assertEqual(score, 88.1)
+        tokenizer.assert_called_once_with(
+            "제목",
+            "본문",
+            truncation=True,
+            max_length=128,
+            padding=True,
+            return_tensors="pt",
+        )
 
 
 class TitleBodyEvidenceTest(unittest.TestCase):
