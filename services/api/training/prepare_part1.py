@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,8 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "part1_body_disjoint"
 
 
 def normalize_text(value: str) -> str:
-    """줄바꿈·연속 공백을 한 칸으로 정리한다."""
+    """JSON 해석 후 남은 큰따옴표 이스케이프와 연속 공백을 정리한다."""
+    value = re.sub(r'\\+"', '"', value)
     return " ".join(value.split())
 
 
@@ -59,7 +61,7 @@ def content_key(article: dict[str, Any]) -> str:
 
 
 def body_key(article: dict[str, Any]) -> str:
-    """공백이 정리된 본문으로 학습·검증 간 중복을 확인한다."""
+    """따옴표·공백이 정리된 본문으로 학습·검증 간 중복을 확인한다."""
     return hashlib.sha256(article["body"].encode("utf-8")).hexdigest()
 
 
@@ -205,7 +207,7 @@ def main() -> None:
         "input": "Part1 라벨링데이터만 사용",
         "label_meaning": {"0": "clickbait", "1": "non_clickbait"},
         "deduplication": "제목+본문 중복 제외 후, Training에 있는 본문을 사용하는 Validation 기사 제외",
-        "body_comparison": "공백 정리 후 본문 일치 (유사 문서 검사는 포함하지 않음)",
+        "body_comparison": "큰따옴표 앞 잔여 역슬래시·공백 정리 후 본문 일치 (유사 문서 검사는 포함하지 않음)",
         "training_unique_bodies": len(training_bodies),
         "train": dict(train_stats),
         "validation": dict(validation_stats),

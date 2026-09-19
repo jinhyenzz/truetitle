@@ -53,6 +53,22 @@ class AnalyzeTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
 
+    def test_analyze_rejects_whitespace_and_over_limit_inputs(self):
+        for title, body in (("   ", "본문"), ("제목", "\n\t"), ("가" * 301, "본문"), ("제목", "가" * 50001)):
+            with self.subTest(title_length=len(title), body_length=len(body)):
+                response = client.post("/analyze", json={"title": title, "body": body})
+                self.assertEqual(response.status_code, 422)
+
+    @unittest.skipUnless(MODEL_PATH.is_dir(), "현재 Transformer 모델 폴더가 로컬에 없어 생략")
+    def test_quote_variants_return_identical_analysis(self):
+        body = '정부는 내년부터 청년 주거 지원을 확대한다고 발표했다.'
+        titles = ('정부 "청년 주거 지원 확대" 발표', '정부 “청년 주거 지원 확대” 발표', '정부 “청년 주거 지원 확대" 발표')
+        responses = [client.post("/analyze", json={"title": title, "body": body}) for title in titles]
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+        self.assertEqual(responses[0].json(), responses[1].json())
+        self.assertEqual(responses[0].json(), responses[2].json())
+
     @unittest.skipUnless(
         MODEL_PATH.is_dir(), "현재 Transformer 모델 폴더가 로컬에 없어 생략"
     )
@@ -72,6 +88,20 @@ class AnalyzeTest(unittest.TestCase):
         self.assertLessEqual(body["clickbait_score"], 100)
         self.assertIn(body["clickbait_signal_level"], (1, 2, 3, 4, 5))
         self.assertTrue(body["clickbait_signal_label"])
+
+    @unittest.skipUnless(
+        MODEL_PATH.is_dir(), "현재 Transformer 모델 폴더가 로컬에 없어 생략"
+    )
+    def test_analyze_accepts_long_title(self):
+        response = client.post(
+            "/analyze",
+            json={
+                "title": "가 " * 149,
+                "body": "본문은 정상적으로 분석되어야 합니다.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
 
 
 if __name__ == "__main__":

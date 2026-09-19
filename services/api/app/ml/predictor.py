@@ -8,7 +8,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 
 MODEL_PATH = Path(__file__).resolve().parents[4] / "artifacts" / "transformer-50000-v1"
-MODEL_NAME = "klue-roberta-small-title-body"
+MODEL_NAME = "klue-roberta-small-50000-v1-quotes-v2"
 WORD_PATTERN = re.compile(r"[가-힣A-Za-z0-9]{2,}")
 MAX_EVIDENCE_TERMS = 3
 SIGNAL_LABELS = {
@@ -18,6 +18,11 @@ SIGNAL_LABELS = {
     4: "낚시성 신호 높음",
     5: "낚시성 신호 매우 높음",
 }
+
+
+def normalize_straight_quotes(title: str) -> str:
+    """짝이 확인되는 큰따옴표만 통일하고, 단독 부호는 보존한다."""
+    return re.sub(r'["“]([^"“”\r\n]*)["”]', r'“\1”', title)
 
 
 class ModelUnavailableError(RuntimeError):
@@ -38,12 +43,18 @@ def load_model():
 
 def find_title_terms_not_in_body(title: str, body: str) -> list[str]:
     normalized_body = body.casefold()
+    body_terms = {
+        term.casefold()
+        for term in WORD_PATTERN.findall(body)
+    }
     seen_terms: set[str] = set()
     evidence: list[str] = []
 
     for term in WORD_PATTERN.findall(title):
         normalized_term = term.casefold()
-        if normalized_term in seen_terms or normalized_term in normalized_body:
+        if normalized_term in seen_terms or term_matches_body(
+            normalized_term, normalized_body, body_terms
+        ):
             continue
         seen_terms.add(normalized_term)
         evidence.append(term)
@@ -53,12 +64,51 @@ def find_title_terms_not_in_body(title: str, body: str) -> list[str]:
     return evidence
 
 
+def term_matches_body(title_term: str, normalized_body: str, body_terms: set[str]) -> bool:
+    if title_term in normalized_body:
+        return True
+    if not is_korean_word(title_term):
+        return False
+    return any(
+        is_korean_variant(title_term, body_term)
+        for body_term in body_terms
+        if is_korean_word(body_term)
+    )
+
+
+def is_korean_word(term: str) -> bool:
+    return bool(term) and all("가" <= character <= "힣" for character in term)
+
+
+def is_korean_variant(left: str, right: str) -> bool:
+    shorter_length = min(len(left), len(right))
+    if shorter_length < 2:
+        return False
+    common_length = 0
+    for left_character, right_character in zip(left, right):
+        if left_character != right_character:
+            break
+        common_length += 1
+    if shorter_length == 2:
+        return common_length == shorter_length
+    return common_length >= shorter_length - 1
+
+
 def calculate_title_body_similarity(title: str, body: str) -> float:
     terms = list(dict.fromkeys(term.casefold() for term in WORD_PATTERN.findall(title)))
     if not terms:
         return 0.0
     normalized_body = body.casefold()
-    return round(sum(term in normalized_body for term in terms) / len(terms) * 100, 1)
+    body_terms = {
+        term.casefold()
+        for term in WORD_PATTERN.findall(body)
+    }
+    return round(
+        sum(term_matches_body(term, normalized_body, body_terms) for term in terms)
+        / len(terms)
+        * 100,
+        1,
+    )
 
 
 def score_to_signal_level(score: float) -> tuple[Literal[1, 2, 3, 4, 5], str]:
@@ -75,15 +125,26 @@ def score_to_signal_level(score: float) -> tuple[Literal[1, 2, 3, 4, 5], str]:
     return level, SIGNAL_LABELS[level]
 
 
-def analyze_article(
-    title: str, body: str
-) -> tuple[float, Literal["clickbait", "non_clickbait"], float, list[str]]:
+def predict_clickbait_score(title: str, body: str) -> float:
     tokenizer, model = load_model()
-    encoded = tokenizer(title, body, truncation="only_second", max_length=128, padding=True, return_tensors="pt")
+    encoded = tokenizer(
+        title,
+        body,
+        truncation=True,
+        max_length=128,
+        padding=True,
+        return_tensors="pt",
+    )
     encoded.pop("token_type_ids", None)
     with torch.no_grad():
         clickbait_probability = torch.softmax(model(**encoded).logits, dim=1)[0, 0].item()
-    score = round(clickbait_probability * 100, 1)
+    return round(clickbait_probability * 100, 1)
+
+
+def analyze_article(
+    title: str, body: str
+) -> tuple[float, Literal["clickbait", "non_clickbait"], float, list[str]]:
+    score = predict_clickbait_score(normalize_straight_quotes(title), body)
     classification = "clickbait" if score >= 50 else "non_clickbait"
     similarity = calculate_title_body_similarity(title, body)
     return score, classification, similarity, find_title_terms_not_in_body(title, body)

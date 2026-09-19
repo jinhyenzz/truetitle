@@ -1,10 +1,44 @@
 import unittest
+from unittest.mock import patch
 
 from app.ml.predictor import (
+    analyze_article,
     calculate_title_body_similarity,
     find_title_terms_not_in_body,
+    normalize_straight_quotes,
     score_to_signal_level,
 )
+
+
+class TitleQuoteNormalizationTest(unittest.TestCase):
+    def test_normalizes_straight_quotes_to_curly_pairs(self):
+        result = normalize_straight_quotes('"첫 문장"과 "다음 문장"')
+
+        self.assertEqual(result, "“첫 문장”과 “다음 문장”")
+
+    def test_preserves_content_and_unpaired_quotes(self):
+        cases = {
+            '“지원 확대" 발표': '“지원 확대” 발표',
+            '"지원 확대” 발표': '“지원 확대” 발표',
+            '“기존 인용”과 "새 인용"': '“기존 인용”과 “새 인용”',
+            '24" 모니터 출시': '24" 모니터 출시',
+            '"끝나지 않은 인용': '"끝나지 않은 인용',
+            "'작은따옴표'와 일반 제목": "'작은따옴표'와 일반 제목",
+            '"첫 줄\n둘째 줄"': '"첫 줄\n둘째 줄"',
+        }
+        for original, expected in cases.items():
+            with self.subTest(title=original):
+                result = normalize_straight_quotes(original)
+                self.assertEqual(result, expected)
+                self.assertEqual(normalize_straight_quotes(result), expected)
+
+    def test_analysis_normalizes_only_model_title_input(self):
+        title = '정부 "지원 확대" 발표'
+        body = '정부는 "지원 확대" 방안을 발표했다.'
+        with patch("app.ml.predictor.predict_clickbait_score", return_value=25.0) as predict:
+            result = analyze_article(title, body)
+        predict.assert_called_once_with('정부 “지원 확대” 발표', body)
+        self.assertEqual(result[:2], (25.0, "non_clickbait"))
 
 
 class TitleBodyEvidenceTest(unittest.TestCase):
@@ -16,6 +50,22 @@ class TitleBodyEvidenceTest(unittest.TestCase):
 
         self.assertEqual(result, ["고공행진", "멈추고", "추락"])
 
+    def test_korean_word_variants_are_not_missing_evidence(self):
+        result = find_title_terms_not_in_body(
+            "국민 주무시기 전 알려드리려 생각한 것",
+            "국민들이 주무시기 전에 방송으로 알려드리고 나름대로 생각했다.",
+        )
+
+        self.assertEqual(result, [])
+
+    def test_partial_term_in_compound_word_remains_matching(self):
+        result = find_title_terms_not_in_body(
+            "계엄 선포",
+            "비상계엄을 선포했다.",
+        )
+
+        self.assertEqual(result, [])
+
 
 class TitleBodySimilarityTest(unittest.TestCase):
     def test_matching_text_scores_higher_than_unrelated_text(self):
@@ -23,6 +73,14 @@ class TitleBodySimilarityTest(unittest.TestCase):
         unrelated_score = calculate_title_body_similarity("축구 경기 결과", "한미약품이 인증을 받았습니다.")
 
         self.assertGreater(matching_score, unrelated_score)
+
+    def test_korean_word_variants_raise_similarity(self):
+        score = calculate_title_body_similarity(
+            "국민 주무시기 전 알려드리려 생각한 것",
+            "국민들이 주무시기 전에 방송으로 알려드리고 나름대로 생각했다.",
+        )
+
+        self.assertEqual(score, 100.0)
 
 
 class SignalLevelTest(unittest.TestCase):
