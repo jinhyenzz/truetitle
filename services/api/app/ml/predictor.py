@@ -34,7 +34,13 @@ def load_model():
     try:
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
         model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH).eval()
-        return tokenizer, model
+        # 모델 config의 label2id에서 "clickbait" 인덱스를 직접 조회한다.
+        # 재학습으로 라벨 순서가 바뀌어도(예: 0/1이 뒤바뀌어도) 점수가 조용히
+        # 뒤집히지 않도록, 인덱스를 하드코딩하지 않고 여기서 한 번 검증해둔다.
+        clickbait_index = model.config.label2id.get("clickbait")
+        if clickbait_index is None:
+            raise ValueError(f"모델 config에 'clickbait' 라벨이 없습니다: {model.config.label2id!r}")
+        return tokenizer, model, clickbait_index
     except Exception as error:
         raise ModelUnavailableError(
             "분석 모델을 불러오지 못했습니다."

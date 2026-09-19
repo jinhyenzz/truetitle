@@ -1,6 +1,6 @@
 import { extractCurrentArticle } from '@/features/detection/extractArticle';
 import { createArticleWidget, WIDGET_ROOT_ID } from '@/features/explanation/articleWidget';
-import { findNaverTitleContainer, isNaverArticle } from '@/sites/naver';
+import { NAVER_ARTICLE_MATCH_PATTERN, findNaverTitleContainer, isNaverArticle } from '@/sites/naver';
 import type { AnalyzeErrorInfo, BackgroundResponseMessage, ExtractResult } from '@/shared/types';
 
 // 이 시간(ms) 동안만 제목이 늦게 렌더링되는지 지켜보고, 지나면 관찰을 포기한다.
@@ -12,6 +12,8 @@ function insertWidget(container: HTMLElement) {
   if (document.getElementById(WIDGET_ROOT_ID)) return; // 기사당 한 세트만 생성
 
   // 클릭할 때마다 값을 올려서, "지금 화면에 보여줘야 할 응답이 어떤 요청의 것인지" 구분하는 용도.
+  // 로딩 중에도 패널의 ✕ 버튼으로 idle로 되돌아가 버튼이 다시 활성화될 수 있으므로(재시도 가능),
+  // 이전 요청의 응답이 늦게 도착해 더 최신 상태를 덮어쓰는 것을 막기 위해 필요하다.
   let requestToken = 0;
 
   const widget = createArticleWidget(() => {
@@ -23,8 +25,6 @@ function insertWidget(container: HTMLElement) {
 
   async function handleAnalyzeClick() {
     // 이 클릭 시점의 토큰을 기억해두고, 응답이 왔을 때 여전히 최신 요청인지 비교한다.
-    // (사용자가 재시도를 연타하거나 짧은 시간에 다른 기사로 이동한 경우, 늦게 도착한
-    //  이전 요청의 응답으로 화면이 잘못 덮어써지는 것을 막기 위함)
     const token = ++requestToken;
 
     // 클릭 시점에 항상 새로 추출한다 (버튼 노출 시점의 캐시된 값을 쓰지 않음).
@@ -93,7 +93,7 @@ function tryInsertNaverWidget() {
 }
 
 export default defineContentScript({
-  matches: ['https://n.news.naver.com/*'],
+  matches: [NAVER_ARTICLE_MATCH_PATTERN],
   main() {
     // 팝업이 "지금 탭의 기사 내용을 줘"라고 요청할 때 응답하는 기존 경로 (그대로 유지).
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

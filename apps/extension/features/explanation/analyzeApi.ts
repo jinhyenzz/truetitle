@@ -5,8 +5,10 @@ import type {
   ClickbaitSignalLevel,
 } from '@/shared/types';
 
-// .env의 WXT_API_BASE_URL로 설정. 없으면 로컬 개발 서버로 기본값 사용.
-const API_BASE_URL = import.meta.env.WXT_API_BASE_URL ?? 'http://127.0.0.1:8001';
+// .env의 WXT_API_BASE_URL로 설정. 없거나 빈 문자열이면 로컬 개발 서버로 기본값 사용.
+// wxt.config.ts의 readApiBaseUrl()과 동일하게 빈 문자열도 "미설정"으로 취급해야
+// host_permissions와 실제 fetch 대상이 어긋나지 않는다.
+const API_BASE_URL = import.meta.env.WXT_API_BASE_URL || 'http://127.0.0.1:8001';
 // 이 시간(ms) 안에 서버가 응답 안 하면 요청을 포기하고 TIMEOUT 에러로 취급한다.
 const REQUEST_TIMEOUT_MS = 15000;
 

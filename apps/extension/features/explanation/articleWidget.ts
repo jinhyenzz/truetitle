@@ -229,6 +229,16 @@ export function createArticleWidget(onAnalyze: () => void): ArticleWidgetHandle 
     onAnalyze();
   });
 
+  // 위젯 안(버튼 또는 패널)에 포커스가 있을 때 Esc를 누르면 패널을 접고 버튼으로 포커스를 되돌린다.
+  // keydown은 composed 이벤트라 Shadow DOM 경계를 넘어 bubbling되지만, wrap에 달아서
+  // 위젯 밖(페이지의 다른 요소)에 포커스가 있을 때는 반응하지 않도록 범위를 좁힌다.
+  wrap.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || panel.hidden) return;
+    event.stopPropagation();
+    setState({ kind: 'idle' });
+    button.focus();
+  });
+
   function setButtonIdle(label: string) {
     button.disabled = false;
     button.removeAttribute('aria-busy');
