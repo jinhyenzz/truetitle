@@ -25,7 +25,7 @@ class PairTokenizationTest(unittest.TestCase):
         encoded = tokenize_article(tokenizer, "제목", "본문", 256)
 
         self.assertEqual(tokenizer.args, ("제목", "본문"))
-        self.assertEqual(tokenizer.kwargs["truncation"], "only_second")
+        self.assertIs(tokenizer.kwargs["truncation"], True)
         self.assertEqual(tokenizer.kwargs["max_length"], 256)
         self.assertNotIn("token_type_ids", encoded)
         self.assertEqual(encoded["input_ids"], "kept")

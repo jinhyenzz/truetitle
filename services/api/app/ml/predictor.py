@@ -6,9 +6,11 @@ from typing import Literal
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from app.ml.text import tokenize_article
 
-MODEL_PATH = Path(__file__).resolve().parents[4] / "artifacts" / "transformer-50000-v1"
-MODEL_NAME = "klue-roberta-small-50000-v1-quotes-v2"
+
+MODEL_PATH = Path(__file__).resolve().parents[4] / "artifacts" / "transformer-10000-quote-normalized-v1"
+MODEL_NAME = "klue-roberta-small-10000-quote-normalized-v1"
 WORD_PATTERN = re.compile(r"[가-힣A-Za-z0-9]{2,}")
 MAX_EVIDENCE_TERMS = 3
 SIGNAL_LABELS = {
@@ -18,23 +20,6 @@ SIGNAL_LABELS = {
     4: "낚시성 신호 높음",
     5: "낚시성 신호 매우 높음",
 }
-
-
-QUOTE_CHARACTERS = ('"', "“", "”")
-
-
-def normalize_straight_quotes(title: str) -> str:
-    """짝이 확인되는 큰따옴표만 통일하고, 단독 부호는 보존한다.
-
-    큰따옴표 개수가 홀수면 어느 것이 실제 짝 없는 부호인지 확정할 수 없다.
-    이 상태에서 그대로 짝짓기를 시도하면 인접한 두 부호를 무조건 짝으로 묶어버려서
-    (예: `X "한 "두"` -> 실제로는 앞의 `"`가 짝 없는 부호이고 `"두"`만 진짜 쌍인데도,
-    앞의 `"`와 `"두` 사이의 `"`를 잘못 짝지어 그 사이 무관한 텍스트까지 인용구로
-    둔갑시킨다) 전체를 원문 그대로 둔다.
-    """
-    if sum(title.count(character) for character in QUOTE_CHARACTERS) % 2 != 0:
-        return title
-    return re.sub(r'["“]([^"“”\r\n]*)["”]', r'“\1”', title)
 
 
 class ModelUnavailableError(RuntimeError):
@@ -143,17 +128,15 @@ def score_to_signal_level(score: float) -> tuple[Literal[1, 2, 3, 4, 5], str]:
     return level, SIGNAL_LABELS[level]
 
 
-def predict_clickbait_score(title: str, body: str) -> float:
+def predict_clickbait_score(title: str, body: str, *, normalize: bool = True) -> float:
     tokenizer, model, clickbait_index = load_model()
-    encoded = tokenizer(
+    encoded = tokenize_article(
+        tokenizer,
         title,
         body,
-        truncation=True,
-        max_length=128,
         padding=True,
-        return_tensors="pt",
+        normalize=normalize,
     )
-    encoded.pop("token_type_ids", None)
     with torch.no_grad():
         clickbait_probability = torch.softmax(model(**encoded).logits, dim=1)[0, clickbait_index].item()
     return round(clickbait_probability * 100, 1)
@@ -162,7 +145,7 @@ def predict_clickbait_score(title: str, body: str) -> float:
 def analyze_article(
     title: str, body: str
 ) -> tuple[float, Literal["clickbait", "non_clickbait"], float, list[str]]:
-    score = predict_clickbait_score(normalize_straight_quotes(title), body)
+    score = predict_clickbait_score(title, body)
     classification = "clickbait" if score >= 50 else "non_clickbait"
     similarity = calculate_title_body_similarity(title, body)
     return score, classification, similarity, find_title_terms_not_in_body(title, body)

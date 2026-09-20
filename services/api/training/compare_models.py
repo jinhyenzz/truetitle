@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from training.data import ArticleExample, load_examples  # noqa: E402
 from training.metrics import calculate_metrics  # noqa: E402
+from app.ml.text import DEFAULT_MAX_LENGTH, tokenize_article  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -41,15 +42,12 @@ def predict_transformer(examples: list[ArticleExample], artifact_dir: Path, batc
     with torch.no_grad():
         for start in range(0, len(examples), batch_size):
             batch = examples[start:start + batch_size]
-            encoded = tokenizer(
+            encoded = tokenize_article(
+                tokenizer,
                 [example.title for example in batch],
                 [example.body for example in batch],
-                truncation="only_second",
-                max_length=128,
                 padding=True,
-                return_tensors="pt",
             )
-            encoded.pop("token_type_ids", None)
             predictions.extend(model(**encoded).logits.argmax(dim=1).tolist())
     return predictions
 
@@ -86,6 +84,13 @@ def main() -> None:
         **metrics,
         "errors": errors[:20],
     }
+    if args.model == "transformer":
+        report.update(
+            artifact_dir=str(args.transformer_artifact_dir.resolve()),
+            max_length=DEFAULT_MAX_LENGTH,
+            truncation="longest_first",
+            normalization="residual double-quote escapes and whitespace in title and body",
+        )
     args.report_path.parent.mkdir(parents=True, exist_ok=True)
     args.report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"정확도: {metrics['accuracy']:.4f}")

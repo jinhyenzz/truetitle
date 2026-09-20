@@ -9,22 +9,20 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.ml.text import normalize_model_text as normalize_text
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_ROOT = PROJECT_ROOT / "146.낚시성 기사 탐지 데이터"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "part1_body_disjoint"
-
-
-def normalize_text(value: str) -> str:
-    """JSON 해석 후 남은 큰따옴표 이스케이프와 연속 공백을 정리한다."""
-    value = re.sub(r'\\+"', '"', value)
-    return " ".join(value.split())
 
 
 def build_article(raw: dict[str, Any]) -> dict[str, Any]:

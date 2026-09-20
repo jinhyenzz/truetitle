@@ -24,26 +24,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from training.data import ArticleExample, LABEL_NAMES, load_examples  # noqa: E402
 from training.metrics import calculate_metrics  # noqa: E402
+from app.ml.text import DEFAULT_MAX_LENGTH, tokenize_article  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INPUT_DIR = PROJECT_ROOT / "data" / "processed" / "part1_body_disjoint"
 DEFAULT_ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "transformer-title-body"
 DEFAULT_MODEL_NAME = "klue/roberta-small"
-
-
-def tokenize_article(tokenizer: Any, title: str, body: str, max_length: int) -> dict[str, torch.Tensor]:
-    """제목은 보존하고, 긴 본문만 자르도록 두 입력을 토크나이저에 전달한다."""
-    encoded = tokenizer(
-        title,
-        body,
-        truncation="only_second",
-        max_length=max_length,
-        padding="max_length",
-        return_tensors="pt",
-    )
-    encoded.pop("token_type_ids", None)
-    return encoded
 
 
 class ArticleDataset(Dataset[dict[str, torch.Tensor]]):
@@ -124,7 +111,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-name", default=DEFAULT_MODEL_NAME)
     parser.add_argument("--max-train-samples", type=int, required=True, help="학습할 최대 기사 수")
     parser.add_argument("--max-validation-samples", type=int, required=True, help="검증할 최대 기사 수")
-    parser.add_argument("--max-length", type=int, default=256, help="제목+본문 토큰 최대 길이")
+    parser.add_argument("--max-length", type=int, default=DEFAULT_MAX_LENGTH, help="제목+본문 토큰 최대 길이 (API 기본값 128)")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
@@ -186,7 +173,8 @@ def main() -> None:
         "dataset": "AI Hub 낚시성 기사 탐지 데이터 Part1",
         "model": args.model_name,
         "input": "가공 제목(newTitle)과 본문(newsContent)을 쌍으로 입력",
-        "truncation": "제목은 유지하고 긴 본문만 max_length까지 절단",
+        "truncation": "longest_first: 제목·본문 중 긴 입력부터 max_length까지 절단",
+        "normalization": "residual double-quote escapes and whitespace in title and body",
         "label_meaning": {str(key): value for key, value in LABEL_NAMES.items()},
         "train_samples": len(train_examples),
         "validation_samples": len(validation_examples),

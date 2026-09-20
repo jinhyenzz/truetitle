@@ -1,0 +1,27 @@
+{
+  "dataset": "AI Hub 낚시성 기사 탐지 데이터 Part1",
+  "model": "klue/roberta-small",
+  "input": "가공 제목(newTitle)과 본문(newsContent)을 쌍으로 입력",
+  "truncation": "제목은 유지하고 긴 본문만 max_length까지 절단",
+  "label_meaning": {
+    "0": "clickbait",
+    "1": "non_clickbait"
+  },
+  "train_samples": 10000,
+  "validation_samples": 2000,
+  "train_label_counts": {
+    "0": 5000,
+    "1": 5000
+  },
+  "validation_label_counts": {
+    "0": 1000,
+    "1": 1000
+  },
+  "max_length": 128,
+  "batch_size": 8,
+  "epochs": 2,
+  "learning_rate": 2e-05,
+  "device": "cpu",
+  "accuracy": 0.956,
+  "f1_macro": 0.955999603996436
+}

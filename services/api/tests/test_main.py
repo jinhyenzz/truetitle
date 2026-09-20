@@ -85,14 +85,38 @@ class AnalyzeTest(unittest.TestCase):
     @unittest.skipUnless(
         _MODEL_AVAILABLE, "현재 Transformer 모델 가중치가 로컬에 없어 생략 (LFS 포인터만 있을 수 있음)"
     )
-    def test_quote_variants_return_identical_analysis(self):
+    def test_escape_variants_return_identical_analysis(self):
         body = '정부는 내년부터 청년 주거 지원을 확대한다고 발표했다.'
-        titles = ('정부 "청년 주거 지원 확대" 발표', '정부 “청년 주거 지원 확대” 발표', '정부 “청년 주거 지원 확대" 발표')
+        titles = ('정부 "청년 주거 지원 확대" 발표', r'정부 \"청년 주거 지원 확대\" 발표', r'정부 \\"청년 주거 지원 확대\\" 발표')
         responses = [client.post("/analyze", json={"title": title, "body": body}) for title in titles]
         for response in responses:
             self.assertEqual(response.status_code, 200)
         self.assertEqual(responses[0].json(), responses[1].json())
         self.assertEqual(responses[0].json(), responses[2].json())
+
+    @unittest.skipUnless(_MODEL_AVAILABLE, "실제 모델 가중치 필요")
+    def test_quote_shapes_do_not_flip_the_prediction(self):
+        body = 'LG는 인공지능 투자 전략을 재정비했다. 구광모 회장은 빠르고 집요하게 실행할 것을 주문했다.'
+        titles = ('구광모 "빠르고 집요하게"…LG, AI 투자전략 재정비', '구광모 “빠르고 집요하게”…LG, AI 투자전략 재정비')
+        responses = [client.post("/analyze", json={"title": title, "body": body}) for title in titles]
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+        scores = [response.json()["clickbait_score"] for response in responses]
+        self.assertLess(abs(scores[0] - scores[1]), 5)
+        self.assertEqual(responses[0].json()["classification"], responses[1].json()["classification"])
+
+    @unittest.skipUnless(_MODEL_AVAILABLE, "실제 모델 가중치 필요")
+    def test_model_distinguishes_matching_and_unrelated_body(self):
+        title = 'LG, AI 투자전략 재정비'
+        bodies = (
+            'LG는 인공지능 투자 전략을 재정비했다. 구광모 회장은 빠르고 집요하게 실행할 것을 주문했다.',
+            '안성시에서 트럭이 행사장으로 돌진해 사망자가 발생했다. 시민들은 추모 공간에서 희생자들을 애도했다.',
+        )
+        responses = [client.post("/analyze", json={"title": title, "body": body}) for body in bodies]
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+        self.assertLess(responses[0].json()["clickbait_score"], 50)
+        self.assertGreaterEqual(responses[1].json()["clickbait_score"], 50)
 
     @unittest.skipUnless(
         _MODEL_AVAILABLE, "현재 Transformer 모델 가중치가 로컬에 없어 생략 (LFS 포인터만 있을 수 있음)"

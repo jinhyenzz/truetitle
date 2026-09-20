@@ -8,33 +8,33 @@ from app.ml.predictor import (
     analyze_article,
     calculate_title_body_similarity,
     find_title_terms_not_in_body,
-    normalize_straight_quotes,
     predict_clickbait_score,
     score_to_signal_level,
 )
+from app.ml.text import normalize_model_text
 
 
-class TitleQuoteNormalizationTest(unittest.TestCase):
-    def test_normalizes_straight_quotes_to_curly_pairs(self):
-        result = normalize_straight_quotes('"첫 문장"과 "다음 문장"')
+class ModelTextNormalizationTest(unittest.TestCase):
+    def test_cleans_escapes_and_whitespace(self):
+        result = normalize_model_text('  정부 \\"지원 확대\\" \n 발표  ')
+        self.assertEqual(result, '정부 "지원 확대" 발표')
 
-        self.assertEqual(result, "“첫 문장”과 “다음 문장”")
-
-    def test_preserves_content_and_unpaired_quotes(self):
+    def test_preserves_quote_shapes_and_unpaired_quotes(self):
         cases = {
-            '“지원 확대" 발표': '“지원 확대” 발표',
-            '"지원 확대” 발표': '“지원 확대” 발표',
-            '“기존 인용”과 "새 인용"': '“기존 인용”과 “새 인용”',
+            '“지원 확대" 발표': '“지원 확대" 발표',
+            '"지원 확대” 발표': '"지원 확대” 발표',
+            '“기존 인용”과 "새 인용"': '“기존 인용”과 "새 인용"',
+            'X "한 "두"': 'X "한 "두"',
             '24" 모니터 출시': '24" 모니터 출시',
             '"끝나지 않은 인용': '"끝나지 않은 인용',
             "'작은따옴표'와 일반 제목": "'작은따옴표'와 일반 제목",
-            '"첫 줄\n둘째 줄"': '"첫 줄\n둘째 줄"',
+            '"첫 줄\n둘째 줄"': '"첫 줄 둘째 줄"',
         }
         for original, expected in cases.items():
             with self.subTest(title=original):
-                result = normalize_straight_quotes(original)
+                result = normalize_model_text(original)
                 self.assertEqual(result, expected)
-                self.assertEqual(normalize_straight_quotes(result), expected)
+                self.assertEqual(normalize_model_text(result), expected)
 
     def test_odd_quote_count_is_left_untouched(self):
         # 큰따옴표가 홀수 개면 어느 것이 짝 없는 부호인지 확정할 수 없다.
@@ -42,16 +42,16 @@ class TitleQuoteNormalizationTest(unittest.TestCase):
         # 그 사이 무관한 텍스트까지 인용구로 잘못 묶이지 않도록 전체를 원문 그대로 둔다.
         title = 'X "한 "두"'
 
-        result = normalize_straight_quotes(title)
+        result = normalize_model_text(title)
 
         self.assertEqual(result, title)
 
-    def test_analysis_normalizes_only_model_title_input(self):
-        title = '정부 "지원 확대" 발표'
-        body = '정부는 "지원 확대" 방안을 발표했다.'
+    def test_analysis_delegates_to_shared_prediction_path(self):
+        title = r'정부 \"지원 확대\" 발표'
+        body = '정부는 \\"지원 확대\\"  방안을\n발표했다.'
         with patch("app.ml.predictor.predict_clickbait_score", return_value=25.0) as predict:
             result = analyze_article(title, body)
-        predict.assert_called_once_with('정부 “지원 확대” 발표', body)
+        predict.assert_called_once_with(title, body)
         self.assertEqual(result[:2], (25.0, "non_clickbait"))
 
 

@@ -62,3 +62,5 @@ Desktop.ini
 !/artifacts/baseline-full/tfidf_logistic_regression.joblib
 !/artifacts/transformer-50000-v1/
 !/artifacts/transformer-50000-v1/**
+!/artifacts/transformer-10000-quote-normalized-v1/
+!/artifacts/transformer-10000-quote-normalized-v1/**
