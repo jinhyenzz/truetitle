@@ -322,3 +322,12 @@
 - 검증: API 환경에서 단위 테스트 2건 통과. FastAPI TestClient로 `/ready`가 200과 `ready: true`를 반환하고, `/analyze`가 200·점수·분류·유사도·근거·모델명을 포함한 기존 계약 형식의 JSON을 반환함을 확인함. `git diff --check` 통과. TestClient 실행 중 Starlette의 `httpx` 사용 중단 예정 경고는 있었으나 API 응답에는 영향이 없었음. Git commit·push·PR·병합은 수행하지 않음.
 - 미검증: 실제 Chrome 확장 프로그램과 새 API의 통합 실행, 최근 네이버 기사 사람 기준 평가, 모델 산출물 배포·공유 방식은 아직 확인하지 않음.
 - 원상복구: 별도 승인 후 위 백업의 predictor·테스트·requirements·변경 기록을 복원하면 TF-IDF API로 돌아갈 수 있음. PyTorch·Transformers 제거와 모델 파일 삭제는 별도 승인 없이는 수행하지 않음.
+## 2026-09-20 - GitHub Actions 모델 미다운로드 환경 테스트 수정
+
+- 요청 및 승인: 사용자가 GitHub Actions API 검사 실패 원인을 확인한 뒤 전체 진행을 승인함.
+- 백업: `services/api/tests/test_main.py`, `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260920-000000/`에 원래 경로로 복사하고 수정 전 SHA-256 일치를 확인함.
+- 수정 파일: `services/api/tests/test_main.py`의 인용부호 변형 및 긴 제목 API 테스트 두 개가 모델 폴더 존재만 확인하던 조건을 실제 가중치 파일 크기까지 확인하는 기존 `_MODEL_AVAILABLE` 조건으로 통일함. 이 조건은 이미 같은 파일의 다른 실제 모델 테스트에서 사용 중이었음.
+- 수정 이유와 영향: GitHub Actions 기본 checkout은 Git LFS 가중치를 내려받지 않아 디렉터리만 존재하고 `model.safetensors`는 작은 포인터 파일로 남을 수 있음. 이때 두 테스트가 실제 모델 로딩을 시도해 503을 기대와 다르게 반환받으며 CI가 실패했음. 이제 모델이 없는 CI에서는 해당 두 모델 의존 테스트를 건너뛰고, 실제 가중치가 있는 로컬에서는 그대로 실행함. API 구현·모델·확장 프로그램·Git LFS 설정은 변경하지 않음.
+- 검증: 로컬 API 가상환경에서 `python -m unittest discover -s tests -p 'test_*.py' -v`를 실행해 36개 테스트가 모두 통과함. 실제 로컬 모델 가중치가 있는 상태에서 인용부호 변형·긴 제목 테스트도 통과함. `git diff --check`도 오류 없이 통과함. 로컬 가상환경에는 `pytest`가 설치되어 있지 않아 동일한 pytest 명령은 실행하지 못했으나, GitHub Actions는 `requirements-dev.txt`에서 pytest를 설치한 뒤 실행함.
+- 미검증: GitHub Actions 원격 재실행 결과는 사용자 커밋·push·PR 후 확인해야 함. Git commit·push·PR·병합은 수행하지 않음.
+- 원상복구: 별도 승인 후 위 백업본의 `test_main.py`와 이 변경 기록을 복원하면 수정 전 상태로 돌아갈 수 있음.

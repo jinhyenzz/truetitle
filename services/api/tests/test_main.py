@@ -82,7 +82,9 @@ class AnalyzeTest(unittest.TestCase):
                 response = client.post("/analyze", json={"title": title, "body": body})
                 self.assertEqual(response.status_code, 422)
 
-    @unittest.skipUnless(MODEL_PATH.is_dir(), "현재 Transformer 모델 폴더가 로컬에 없어 생략")
+    @unittest.skipUnless(
+        _MODEL_AVAILABLE, "현재 Transformer 모델 가중치가 로컬에 없어 생략 (LFS 포인터만 있을 수 있음)"
+    )
     def test_quote_variants_return_identical_analysis(self):
         body = '정부는 내년부터 청년 주거 지원을 확대한다고 발표했다.'
         titles = ('정부 "청년 주거 지원 확대" 발표', '정부 “청년 주거 지원 확대” 발표', '정부 “청년 주거 지원 확대" 발표')
@@ -113,7 +115,7 @@ class AnalyzeTest(unittest.TestCase):
         self.assertTrue(body["clickbait_signal_label"])
 
     @unittest.skipUnless(
-        MODEL_PATH.is_dir(), "현재 Transformer 모델 폴더가 로컬에 없어 생략"
+        _MODEL_AVAILABLE, "현재 Transformer 모델 가중치가 로컬에 없어 생략 (LFS 포인터만 있을 수 있음)"
     )
     def test_analyze_accepts_long_title(self):
         response = client.post(
