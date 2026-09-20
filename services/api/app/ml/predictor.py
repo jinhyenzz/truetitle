@@ -20,8 +20,20 @@ SIGNAL_LABELS = {
 }
 
 
+QUOTE_CHARACTERS = ('"', "“", "”")
+
+
 def normalize_straight_quotes(title: str) -> str:
-    """짝이 확인되는 큰따옴표만 통일하고, 단독 부호는 보존한다."""
+    """짝이 확인되는 큰따옴표만 통일하고, 단독 부호는 보존한다.
+
+    큰따옴표 개수가 홀수면 어느 것이 실제 짝 없는 부호인지 확정할 수 없다.
+    이 상태에서 그대로 짝짓기를 시도하면 인접한 두 부호를 무조건 짝으로 묶어버려서
+    (예: `X "한 "두"` -> 실제로는 앞의 `"`가 짝 없는 부호이고 `"두"`만 진짜 쌍인데도,
+    앞의 `"`와 `"두` 사이의 `"`를 잘못 짝지어 그 사이 무관한 텍스트까지 인용구로
+    둔갑시킨다) 전체를 원문 그대로 둔다.
+    """
+    if sum(title.count(character) for character in QUOTE_CHARACTERS) % 2 != 0:
+        return title
     return re.sub(r'["“]([^"“”\r\n]*)["”]', r'“\1”', title)
 
 

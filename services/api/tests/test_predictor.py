@@ -36,6 +36,16 @@ class TitleQuoteNormalizationTest(unittest.TestCase):
                 self.assertEqual(result, expected)
                 self.assertEqual(normalize_straight_quotes(result), expected)
 
+    def test_odd_quote_count_is_left_untouched(self):
+        # 큰따옴표가 홀수 개면 어느 것이 짝 없는 부호인지 확정할 수 없다.
+        # 앞의 짝 없는 "가 뒤의 진짜 쌍("두")의 여는 부호를 가로채
+        # 그 사이 무관한 텍스트까지 인용구로 잘못 묶이지 않도록 전체를 원문 그대로 둔다.
+        title = 'X "한 "두"'
+
+        result = normalize_straight_quotes(title)
+
+        self.assertEqual(result, title)
+
     def test_analysis_normalizes_only_model_title_input(self):
         title = '정부 "지원 확대" 발표'
         body = '정부는 "지원 확대" 방안을 발표했다.'
