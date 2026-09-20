@@ -68,13 +68,28 @@ class ResolveClientKeyTest(unittest.TestCase):
 
         self.assertEqual(key, "203.0.113.5")
 
-    def test_uses_forwarded_for_first_value_when_proxy_trusted(self):
+    def test_uses_forwarded_for_last_value_when_proxy_trusted(self):
+        # 마지막 값은 신뢰하는 프록시 자신이 실제 연결을 보고 덧붙인 값이다.
+        # 앞쪽 값(198.51.100.9)은 클라이언트가 보낸 헤더를 그대로 옮긴 것일 수 있어 신뢰하지 않는다.
         request = _FakeRequest("203.0.113.5", {"x-forwarded-for": "198.51.100.9, 203.0.113.5"})
 
         with patch("app.core.rate_limit.TRUST_PROXY_HEADERS", True):
             key = _resolve_client_key(request)
 
-        self.assertEqual(key, "198.51.100.9")
+        self.assertEqual(key, "203.0.113.5")
+
+    def test_ignores_client_spoofed_leading_value(self):
+        # 클라이언트가 X-Forwarded-For를 직접 위조해도(예: 요청마다 다른 가짜 IP),
+        # 신뢰하는 프록시가 실제 연결 IP를 마지막에 덧붙이므로 매번 같은 키로 잡혀야 한다.
+        first = _FakeRequest("203.0.113.5", {"x-forwarded-for": "1.1.1.1, 203.0.113.5"})
+        second = _FakeRequest("203.0.113.5", {"x-forwarded-for": "9.9.9.9, 203.0.113.5"})
+
+        with patch("app.core.rate_limit.TRUST_PROXY_HEADERS", True):
+            first_key = _resolve_client_key(first)
+            second_key = _resolve_client_key(second)
+
+        self.assertEqual(first_key, second_key)
+        self.assertEqual(first_key, "203.0.113.5")
 
     def test_falls_back_to_direct_ip_when_header_missing_even_if_trusted(self):
         request = _FakeRequest("203.0.113.5")

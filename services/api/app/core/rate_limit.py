@@ -95,8 +95,11 @@ def _resolve_client_key(request: Request) -> str:
     if TRUST_PROXY_HEADERS:
         forwarded_for = request.headers.get("x-forwarded-for")
         if forwarded_for:
-            # 체인의 첫 값이 프록시에 가장 먼저 도달한 클라이언트 IP다.
-            return forwarded_for.split(",")[0].strip()
+            # 체인의 앞쪽 값은 클라이언트가 보낸 헤더를 그대로 옮긴 것일 수 있어 위조 가능하다.
+            # 신뢰하는 리버스 프록시(단일 홉)가 실제로 연결을 받은 클라이언트 IP를 덧붙이는
+            # 마지막 값만 신뢰한다. 앞 값을 쓰면 클라이언트가 X-Forwarded-For를 직접 위조해
+            # 매 요청마다 다른 키로 잡혀 요청 제한을 우회할 수 있다.
+            return forwarded_for.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 

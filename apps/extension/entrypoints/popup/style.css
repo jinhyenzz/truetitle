@@ -1,42 +1,40 @@
 :root {
-  --bg: #f7f7f8;
-  --surface: #ffffff;
-  --border: #e5e5e8;
-  --text: #18181b;
-  --text-muted: #71717a;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --page-bg: #e9edf3;
+  --card-bg: #f5f7fa;
+  --card-border: #d5dbe3;
+  --text: #16202c;
+  --text-muted: #55606d;
+  --primary: #1d4ed8;
   --primary-text: #ffffff;
-  --danger: #ef4444;
-  --danger-bg: #fef2f2;
-  --warn: #f59e0b;
-  --warn-bg: #fffbeb;
-  --safe: #16a34a;
-  --safe-bg: #f0fdf4;
-  --chip-bg: #f4f4f5;
-  --chip-text: #3f3f46;
-  --radius: 12px;
-  --radius-sm: 8px;
+  --danger: #d92d20;
+  --track-bg: #dfe5ee;
+  --meter-1: #17a05e;
+  --meter-2: #7cb342;
+  --meter-3: #e8a117;
+  --meter-4: #ef6c1a;
+  --meter-5: #d92d20;
+  --shadow: rgba(22, 32, 44, 0.12);
+  --radius: 16px;
+  --radius-sm: 10px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #18181b;
-    --surface: #232326;
-    --border: #33333a;
-    --text: #f4f4f5;
-    --text-muted: #a1a1aa;
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
-    --primary-text: #ffffff;
-    --danger: #f87171;
-    --danger-bg: #2a1515;
-    --warn: #fbbf24;
-    --warn-bg: #2a2110;
-    --safe: #4ade80;
-    --safe-bg: #12241a;
-    --chip-bg: #2c2c30;
-    --chip-text: #d4d4d8;
+    --page-bg: #0b0d10;
+    --card-bg: #15191f;
+    --card-border: #2c343d;
+    --text: #eef2f7;
+    --text-muted: #8c97a4;
+    --primary: #5b8cff;
+    --primary-text: #10141a;
+    --danger: #ff6b5e;
+    --track-bg: #262e37;
+    --meter-1: #3ecf8e;
+    --meter-2: #8fd14f;
+    --meter-3: #ffc44d;
+    --meter-4: #ff9245;
+    --meter-5: #ff6b5e;
+    --shadow: rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -44,41 +42,144 @@
   box-sizing: border-box;
 }
 
+html {
+  /* overflow가 기본값(visible)이면 body의 overflow-y가 뷰포트 쪽으로 위임되면서
+     body 자신은 더 이상 스크롤 컨테이너가 되지 않는 경우가 있다. 그러면 팝업이
+     600px에서 안 멈추고 컨텐츠 길이만큼 계속 커지려는 것처럼 보인다. 여기서 막아서
+     아래 body가 항상 스스로 스크롤하게(=팝업 크기는 고정) 만든다. */
+  overflow: hidden;
+}
+
 body {
-  width: 340px;
+  width: 350px;
+  max-height: 600px;
   margin: 0;
-  padding: 14px;
-  background: var(--bg);
+  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* 스크롤바가 나타나는 순간에도 그만큼 공간을 항상 미리 잡아둬서, 콘텐츠가
+     길어져 스크롤이 생길 때 팝업 너비가 움찔거리며 커지는 것처럼 보이지 않게 한다. */
+  scrollbar-gutter: stable;
+  background: var(--page-bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  /* 기본값(normal)은 한글 음절 사이 어디서나 줄바꿈을 허용해서 "없어요."가
+     "없어" / "요."처럼 단어 중간에서 잘린다. keep-all로 띄어쓰기 단위로만
+     줄바꿈하고, 그래도 한 단어(긴 도메인 등)가 너무 길면 break-word로 넘친다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
+
+/* ---------- scrollbar ---------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: padding-box;
+}
+
+/* ---------- header ---------- */
 
 .app-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.app-header .icon {
-  font-size: 18px;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
 }
 
 .app-header h1 {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text);
 }
 
+.reset-btn {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--text-muted);
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* ---------- card shell ---------- */
+
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius);
-  padding: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px var(--shadow);
+}
+
+.card-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.card-section:last-child {
+  border-bottom: none;
+}
+
+.card-section.no-divider {
+  border-bottom: none;
+}
+
+.result-block {
+  border-top: 1px solid var(--card-border);
 }
 
 .state-center {
@@ -86,15 +187,19 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 28px 8px;
+  padding: 28px 16px;
   text-align: center;
   color: var(--text-muted);
+}
+
+.result-block.state-center {
+  padding: 20px 16px;
 }
 
 .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid var(--border);
+  border: 2px solid var(--card-border);
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -110,10 +215,23 @@ body {
   font-size: 24px;
 }
 
-.article-title {
-  margin: 0 0 8px;
-  font-size: 15px;
+/* ---------- article section ---------- */
+
+.article-label {
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.article-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
   color: var(--text);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -122,177 +240,180 @@ body {
 }
 
 .article-preview {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.55;
   color: var(--text-muted);
-  font-size: 13px;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .article-meta {
-  margin: 0 0 14px;
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
   color: var(--text-muted);
-  font-size: 12px;
+  margin: 0;
 }
 
-.btn {
+/* ---------- score section ---------- */
+
+.score-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.score-value {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 0.86;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-value.sig-1 {
+  color: var(--meter-1);
+}
+.score-value.sig-2 {
+  color: var(--meter-2);
+}
+.score-value.sig-3 {
+  color: var(--meter-3);
+}
+.score-value.sig-4 {
+  color: var(--meter-4);
+}
+.score-value.sig-5 {
+  color: var(--meter-5);
+}
+
+.score-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 2px;
+}
+
+.score-pill {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 9px 14px;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  align-self: flex-start;
 }
 
-.btn-primary {
-  background: var(--primary);
-  color: var(--primary-text);
+.score-pill.sig-1 {
+  background: color-mix(in srgb, var(--meter-1) 18%, var(--card-bg));
+  color: var(--meter-1);
+}
+.score-pill.sig-2 {
+  background: color-mix(in srgb, var(--meter-2) 18%, var(--card-bg));
+  color: var(--meter-2);
+}
+.score-pill.sig-3 {
+  background: color-mix(in srgb, var(--meter-3) 18%, var(--card-bg));
+  color: var(--meter-3);
+}
+.score-pill.sig-4 {
+  background: color-mix(in srgb, var(--meter-4) 18%, var(--card-bg));
+  color: var(--meter-4);
+}
+.score-pill.sig-5 {
+  background: color-mix(in srgb, var(--meter-5) 18%, var(--card-bg));
+  color: var(--meter-5);
 }
 
-.btn-primary:hover {
-  background: var(--primary-hover);
+.score-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
 }
 
-.btn-secondary {
-  background: var(--chip-bg);
-  color: var(--text);
-  margin-top: 10px;
+.score-sub {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
-.btn-secondary:hover {
-  background: var(--border);
+.meter-track {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
 }
 
-#analyze-result {
-  margin-top: 12px;
+.meter-seg {
+  height: 8px;
+  border-radius: 999px;
 }
 
-.result-card {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+.meter-pointer-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-top: 2px;
+  height: 16px;
 }
 
-.score-row {
+.meter-pointer {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 2px;
 }
 
-.score-badge {
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
+.meter-caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid;
+}
+
+.meter-current-label {
+  font-size: 10px;
   font-weight: 700;
 }
 
-/* 5단계 낚시성 신호 색상 (1=매우 낮음 ~ 5=매우 높음) */
-.score-badge.sig-1,
-.score-info .score-label.sig-1 {
-  color: #16a34a;
-}
-.score-badge.sig-2,
-.score-info .score-label.sig-2 {
-  color: #84cc16;
-}
-.score-badge.sig-3,
-.score-info .score-label.sig-3 {
-  color: #f59e0b;
-}
-.score-badge.sig-4,
-.score-info .score-label.sig-4 {
-  color: #f97316;
-}
-.score-badge.sig-5,
-.score-info .score-label.sig-5 {
-  color: #ef4444;
-}
-
-.score-badge.sig-1 {
-  background: color-mix(in srgb, #16a34a 15%, transparent);
-}
-.score-badge.sig-2 {
-  background: color-mix(in srgb, #84cc16 15%, transparent);
-}
-.score-badge.sig-3 {
-  background: color-mix(in srgb, #f59e0b 15%, transparent);
-}
-.score-badge.sig-4 {
-  background: color-mix(in srgb, #f97316 15%, transparent);
-}
-.score-badge.sig-5 {
-  background: color-mix(in srgb, #ef4444 15%, transparent);
-}
-
-.score-info .score-label {
-  font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 2px;
-}
-
-.score-info .score-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.level-meter {
+.meter-scale {
   display: flex;
-  gap: 4px;
-  margin: 0 0 12px;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-top: 10px;
 }
 
-.level-dot {
-  flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--chip-bg);
-}
-
-.level-dot.filled.sig-1 {
-  background: #16a34a;
-}
-.level-dot.filled.sig-2 {
-  background: #84cc16;
-}
-.level-dot.filled.sig-3 {
-  background: #f59e0b;
-}
-.level-dot.filled.sig-4 {
-  background: #f97316;
-}
-.level-dot.filled.sig-5 {
-  background: #ef4444;
-}
-
-.similarity-row {
-  margin-bottom: 12px;
-}
+/* ---------- similarity section ---------- */
 
 .similarity-label {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.similarity-label .similarity-pct {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .similarity-track {
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
-  background: var(--chip-bg);
   overflow: hidden;
+  background: var(--track-bg);
 }
 
 .similarity-fill {
@@ -301,37 +422,36 @@ body {
   background: var(--primary);
 }
 
-.evidence-block {
-  margin-bottom: 12px;
-}
+/* ---------- evidence / 근거 section ---------- */
 
 .evidence-title {
   font-size: 12px;
-  color: var(--text-muted);
-  margin: 0 0 6px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text);
 }
 
 .evidence-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin: 0 0 8px;
 }
 
 .chip {
-  background: var(--chip-bg);
-  color: var(--chip-text);
   font-size: 12px;
-  padding: 3px 8px;
+  font-weight: 500;
+  padding: 5px 10px;
   border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 15%, var(--card-bg));
+  color: var(--danger);
 }
 
 .explanation {
   margin: 0;
-  font-size: 13px;
-  color: var(--text);
-  background: var(--chip-bg);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-muted);
 }
 
 .mock-note {
@@ -341,54 +461,55 @@ body {
   text-align: right;
 }
 
-.error-text {
-  color: var(--danger);
-  margin: 0 0 4px;
-  font-size: 13px;
-}
+/* ---------- buttons ---------- */
 
-.settings-bar {
-  display: flex;
+.btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.toggle-row input {
-  cursor: pointer;
-}
-
-.link-btn {
+  justify-content: center;
+  width: 100%;
+  padding: 12px 14px;
   border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-decoration: underline;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
+  transition: filter 0.15s ease;
 }
 
-.link-btn:hover {
-  color: var(--text);
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
 }
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.btn-secondary {
+  background: color-mix(in srgb, var(--text) 8%, var(--card-bg));
+  color: var(--text);
+  margin-top: 10px;
+}
+
+.btn-secondary:hover {
+  background: color-mix(in srgb, var(--text) 14%, var(--card-bg));
+}
+
+/* ---------- misc states ---------- */
 
 .consent-text {
   margin: 0 0 14px;
   font-size: 13px;
   color: var(--text);
   line-height: 1.6;
+  text-align: center;
 }
 
 .disabled-note {
@@ -396,4 +517,10 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   text-align: center;
+}
+
+.error-text {
+  color: var(--danger);
+  margin: 0 0 4px;
+  font-size: 13px;
 }

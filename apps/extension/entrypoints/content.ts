@@ -1,11 +1,30 @@
 import { extractCurrentArticle } from '@/features/detection/extractArticle';
 import { createArticleWidget, WIDGET_ROOT_ID } from '@/features/explanation/articleWidget';
+import { DAUM_ARTICLE_MATCH_PATTERN, findDaumTitleContainer, isDaumArticle } from '@/sites/daum';
+import { findGenericTitleContainer } from '@/sites/generic';
 import { NAVER_ARTICLE_MATCH_PATTERN, findNaverTitleContainer, isNaverArticle } from '@/sites/naver';
 import type { AnalyzeErrorInfo, BackgroundResponseMessage, ExtractResult } from '@/shared/types';
 
 // 이 시간(ms) 동안만 제목이 늦게 렌더링되는지 지켜보고, 지나면 관찰을 포기한다.
 // (페이지 전체를 무한정 감시하지 않기 위함)
 const TITLE_WAIT_TIMEOUT_MS = 10000;
+
+// 지원 사이트 목록. match로 현재 URL이 이 사이트인지 판별하고,
+// findTitleContainer로 버튼을 붙일 기준 요소를 찾는다. 전용 어댑터가 있는 사이트를
+// 추가할 때는 이 배열과 features/detection/extractArticle.ts의 extractors, wxt.config.ts의
+// host_permissions, 아래 defineContentScript의 matches를 함께 늘려야 한다.
+// (구글은 검색결과/뉴스 목록이 아니라 최종 도착한 언론사 페이지만 분석 대상이므로,
+// 이 목록에는 실제 기사를 호스팅하는 언론사 도메인만 넣고 google.com/news.google.com은 넣지 않는다.)
+const SITES = [
+  { match: isNaverArticle, findTitleContainer: findNaverTitleContainer },
+  { match: isDaumArticle, findTitleContainer: findDaumTitleContainer },
+  // 전용 어댑터가 없는 그 외 언론사. 이 콘텐츠 스크립트는 정적 매치(네이버/다음) 또는
+  // 사용자가 features/permissions/sitePermissions.ts를 통해 직접 허용한 도메인에만
+  // 주입되므로, 여기 도달했다는 것 자체가 이미 허용된 사이트라는 뜻이다 (URL로 다시
+  // 가릴 필요가 없다). 실제 기사 여부는 findGenericTitleContainer/extractGenericArticle의
+  // 구조화 데이터 검사가 가린다.
+  { match: () => true, findTitleContainer: findGenericTitleContainer },
+];
 
 // container(제목 블록) 바로 위에 위젯(버튼+결과패널)을 한 번만 만들어 붙인다.
 function insertWidget(container: HTMLElement) {
@@ -65,14 +84,15 @@ function insertWidget(container: HTMLElement) {
   }
 }
 
-// 네이버 기사 페이지인지 확인하고, 제목 영역을 찾을 수 있을 때만 위젯을 삽입한다.
-function tryInsertNaverWidget() {
-  if (!isNaverArticle(location.href)) return;
+// 지원하는 언론사 기사 페이지인지 확인하고, 제목 영역을 찾을 수 있을 때만 위젯을 삽입한다.
+function tryInsertWidget() {
+  const site = SITES.find((candidate) => candidate.match(location.href));
+  if (!site) return;
 
   // 제목 컨테이너 + 실제 추출 가능 여부(본문 포함)까지 확인된 경우에만 true.
   // 둘 다 확인해야 "엉뚱한 위치에 버튼만 덩그러니 삽입"되는 상황을 막을 수 있다.
   const insertIfReady = (): boolean => {
-    const container = findNaverTitleContainer(document);
+    const container = site.findTitleContainer(document);
     if (!container) return false;
     if (!extractCurrentArticle(location.href, document).isArticle) return false;
     insertWidget(container);
@@ -93,7 +113,7 @@ function tryInsertNaverWidget() {
 }
 
 export default defineContentScript({
-  matches: [NAVER_ARTICLE_MATCH_PATTERN],
+  matches: [NAVER_ARTICLE_MATCH_PATTERN, DAUM_ARTICLE_MATCH_PATTERN],
   main() {
     // 팝업이 "지금 탭의 기사 내용을 줘"라고 요청할 때 응답하는 기존 경로 (그대로 유지).
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -103,6 +123,6 @@ export default defineContentScript({
     });
 
     // 제목 옆(위) 인라인 분석 버튼 삽입 시도.
-    tryInsertNaverWidget();
+    tryInsertWidget();
   },
 });

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { defineConfig } from 'wxt';
+import { DAUM_ARTICLE_MATCH_PATTERN } from './sites/daum';
 import { NAVER_ARTICLE_MATCH_PATTERN } from './sites/naver';
 
 // wxt.config.ts는 WXT가 .env를 로드하기 전에 평가되므로 여기선 직접 읽는다.
@@ -17,8 +18,12 @@ const apiBaseUrl = readApiBaseUrl();
 
 export default defineConfig({
   manifest: {
-    name: '낚시성 제목 탐지기',
+    name: 'TrueTitle',
     permissions: ['activeTab', 'scripting', 'storage'],
-    host_permissions: [NAVER_ARTICLE_MATCH_PATTERN, `${apiBaseUrl}/*`],
+    host_permissions: [NAVER_ARTICLE_MATCH_PATTERN, DAUM_ARTICLE_MATCH_PATTERN, `${apiBaseUrl}/*`],
+    // 기본 권한에는 넣지 않고, 사용자가 팝업에서 "이 사이트 허용"을 눌렀을 때만
+    // features/permissions/sitePermissions.ts가 해당 origin 하나만 요청한다.
+    // 모든 사이트를 처음부터 열어주지 않기 위한 선택 권한 선언.
+    optional_host_permissions: ['https://*/*'],
   },
 });
