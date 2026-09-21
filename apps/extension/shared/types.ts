@@ -1,21 +1,18 @@
-// content script가 기사 페이지에서 제목/본문을 뽑아낸 결과.
-// isArticle이 false면 title/body는 없다고 보고 UI에서 "기사 아님" 상태를 보여준다.
+// content script가 기사 페이지에서 뽑아낸 결과. isArticle이 false면 title/body는 없다.
 export interface ExtractResult {
   isArticle: boolean;
   title?: string;
   body?: string;
 }
 
-// analyzeApi.ts가 분석 서버(/analyze)에 보낼 때 쓰는 요청 형태.
-// 서버 계약상 실제로 전송되는 필드는 title/body뿐이고 url은 로그 등에 쓰지 않는다.
+// analyzeApi.ts가 분석 서버(/analyze)로 보내는 요청. 실제 전송 필드는 title/body뿐.
 export interface AnalyzeRequest {
   url: string;
   title: string;
   body: string;
 }
 
-// 1(매우 낮음)~5(매우 높음) 5단계 낚시성 신호. 점수(clickbaitScore)를 클라이언트에서
-// 다시 등급으로 계산하지 않고, 서버가 내려주는 값을 그대로 신뢰해서 표시한다.
+// 1(매우 낮음)~5(매우 높음) 5단계 낚시성 신호. 서버가 내려주는 값을 그대로 신뢰해서 표시한다.
 export type ClickbaitSignalLevel = 1 | 2 | 3 | 4 | 5;
 
 // 분석 서버 응답을 프론트에서 쓰기 좋은 camelCase로 옮겨 담은 결과.
@@ -43,6 +40,7 @@ export type AnalyzeErrorCode =
   | 'DISABLED' // 동의는 했지만 OFF 상태
   | 'INVALID_INPUT' // 제목/본문이 비었거나 서버가 422를 반환
   | 'MODEL_UNAVAILABLE' // 서버가 503 (모델 준비 안 됨)
+  | 'RATE_LIMITED' // 서버가 429 (요청 과다, Retry-After 헤더 포함)
   | 'TIMEOUT' // 지정 시간 내 응답 없음
   | 'NETWORK_ERROR' // fetch 자체가 실패 (서버 꺼짐 등)
   | 'UNKNOWN';
@@ -62,8 +60,7 @@ export interface AnalyzeArticleMessage {
   };
 }
 
-// 지금은 메시지 종류가 하나뿐이라 union이 아니지만, background.ts에서
-// "우리가 아는 메시지인지"를 타입가드로 검증할 때 이 타입 기준으로 판단한다.
+// 지금은 메시지 종류가 하나뿐이라 union이 아니지만, background.ts의 타입가드가 이 타입 기준으로 판단한다.
 export type BackgroundRequestMessage = AnalyzeArticleMessage;
 
 // background가 chrome.runtime.sendMessage 응답으로 돌려주는 형태.

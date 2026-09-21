@@ -5,6 +5,7 @@ import {
   repairContentScriptRegistration,
   requestSitePermission,
 } from '@/features/permissions/sitePermissions';
+import { clampPercent, meterAriaLabel, scoreSubLabel, signalClass } from '@/shared/resultView';
 import { getAnalysisBlockedReason, getSettings, resetSettings, setSettings } from '@/settings/settings';
 import { isDaumArticle } from '@/sites/daum';
 import { isNaverArticle } from '@/sites/naver';
@@ -20,12 +21,17 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 
 const BODY_PREVIEW_LENGTH = 200;
 
-// public/icon-48.png (낚시대 아이콘)를 헤더 배지로 그대로 쓴다. 확장 빌드 결과물마다
-// 실제 경로가 달라질 수 있어 하드코딩 대신 runtime.getURL로 절대 URL을 구한다.
+// init()이 호출될 때마다 증가한다. 분석 요청(handleAnalyze)이 응답을 기다리는 동안
+// 초기화 버튼 등으로 팝업이 다시 그려져 #analyze-result가 사라질 수 있으므로,
+// 응답이 왔을 때 이 값을 비교해 이미 지난 렌더링이면 DOM을 건드리지 않는다.
+let renderGeneration = 0;
+
+// public/icon-48.png를 헤더 배지로 쓴다. 빌드마다 경로가 달라질 수 있어
+// 하드코딩 대신 runtime.getURL로 절대 URL을 구한다.
 const HEADER_ICON_URL = chrome.runtime.getURL('icon-48.png');
 
-// settings가 주어지면(=동의 완료 후 화면들) 헤더 오른쪽에 초기화 버튼을 같이 그린다.
-// 동의 전 화면(renderConsent)에는 초기화할 대상이 없으므로 settings=null로 호출한다.
+// settings가 있으면(동의 완료 후) 헤더에 ON/OFF 토글과 초기화 버튼을 같이 그린다.
+// 동의 전 화면(renderConsent)은 둘 다 의미가 없어 null로 호출한다.
 function header(settings: Settings | null): string {
   return `
     <div class="app-header">
@@ -33,24 +39,43 @@ function header(settings: Settings | null): string {
         <img class="header-icon" src="${HEADER_ICON_URL}" alt="" />
         <h1>TrueTitle - 낚시성 제목 탐지기</h1>
       </div>
-      ${settings ? '<button id="reset-settings-btn" class="reset-btn" type="button">초기화</button>' : ''}
+      ${
+        settings
+          ? `
+        <div class="header-right">
+          <label class="toggle-switch">
+            <input type="checkbox" id="enabled-toggle" ${settings.enabled ? 'checked' : ''} aria-label="분석 기능 켜기/끄기" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+          <button id="reset-settings-btn" class="reset-btn" type="button">초기화</button>
+        </div>
+      `
+          : ''
+      }
     </div>
   `;
 }
 
-// header()가 초기화 버튼을 그렸다면 클릭 핸들러를 연결한다. 모든 동의-후 화면에서
-// 같은 id를 재사용하므로, 화면이 다시 그려질 때마다 한 번만 호출하면 된다.
-function bindResetButton() {
+// header()가 그린 토글/초기화 버튼에 핸들러를 연결한다. 화면이 다시 그려질 때마다 호출.
+// 두 핸들러 모두 마지막에 init()을 다시 호출한다 — renderGeneration이 올라가면서
+// 그 시점에 응답을 기다리던 handleAnalyze가 있어도 그 결과를 무시하게 된다.
+function bindHeaderControls() {
   document.querySelector('#reset-settings-btn')?.addEventListener('click', async () => {
     const confirmed = window.confirm('동의 상태를 초기화할까요? 다시 사용하려면 동의 화면부터 진행해야 해요.');
     if (!confirmed) return;
     await resetSettings();
     init();
   });
+
+  document.querySelector<HTMLInputElement>('#enabled-toggle')?.addEventListener('change', async (event) => {
+    const enabled = (event.target as HTMLInputElement).checked;
+    await setSettings({ enabled });
+    init();
+  });
 }
 
 // consented가 false일 때만 보여주는 최초 1회 동의 화면.
-// 동의를 누르면 consented+enabled를 함께 true로 저장하고 init()을 다시 실행해 본화면으로 전환한다.
+// 동의 시 consented+enabled를 함께 true로 저장하고 init()으로 본화면 전환.
 function renderConsent() {
   app.innerHTML = `
     ${header(null)}
@@ -78,7 +103,7 @@ function renderLoading(settings: Settings) {
       <p>기사 정보를 불러오는 중...</p>
     </div>
   `;
-  bindResetButton();
+  bindHeaderControls();
 }
 
 function renderNotArticle(settings: Settings) {
@@ -89,11 +114,11 @@ function renderNotArticle(settings: Settings) {
       <p>기사 페이지가 아니거나<br />본문을 읽을 수 없어요.</p>
     </div>
   `;
-  bindResetButton();
+  bindHeaderControls();
 }
 
-// 네이버·다음처럼 매니페스트에 고정으로 들어있지 않고, 사용자가 아직 허용하지 않은
-// 사이트에서 팝업을 열었을 때 보여준다. onAllow는 "이 사이트 허용" 클릭 시 실행된다.
+// 네이버·다음이 아니면서 아직 사용자가 허용하지 않은 사이트에서 팝업을 열었을 때 보여준다.
+// onAllow는 "이 사이트 허용" 클릭 시 실행된다.
 function renderPermissionPrompt(url: string, settings: Settings, onAllow: () => void) {
   app.innerHTML = `
     ${header(settings)}
@@ -104,15 +129,13 @@ function renderPermissionPrompt(url: string, settings: Settings, onAllow: () => 
       <button id="allow-site-btn" class="btn btn-primary">이 사이트 허용</button>
     </div>
   `;
-  // hostname은 URL 파서가 만든 값이라 안전하지만, 다른 곳과 일관되게 textContent로 채운다.
   (app.querySelector('.permission-host') as HTMLElement).textContent = new URL(url).hostname;
   document.querySelector('#allow-site-btn')!.addEventListener('click', onAllow);
-  bindResetButton();
+  bindHeaderControls();
 }
 
-// 현재 탭이 지원하는 기사일 때 보여주는 카드. settings.enabled가 꺼져 있으면
-// 분석 버튼을 비활성화하고 안내 문구만 보여준다 (버튼 자체를 숨기지는 않음).
-// tabUrl은 "검사한 기사" 메타 행에 출처 도메인을 보여주기 위한 것으로, 서버로는 전송하지 않는다.
+// 현재 탭이 지원하는 기사일 때 보여주는 카드. enabled가 꺼져 있으면 버튼을
+// 비활성화만 하고 숨기지는 않는다. tabUrl은 출처 도메인 표시용이며 서버로는 전송하지 않는다.
 function renderArticle(result: ExtractResult, settings: Settings, tabUrl: string) {
   const preview =
     result.body!.slice(0, BODY_PREVIEW_LENGTH) + (result.body!.length > BODY_PREVIEW_LENGTH ? '...' : '');
@@ -138,13 +161,13 @@ function renderArticle(result: ExtractResult, settings: Settings, tabUrl: string
       </div>
       <div class="card-section no-divider">
         <button id="analyze-btn" class="btn btn-primary" ${settings.enabled ? '' : 'disabled'}>분석하기</button>
-        ${settings.enabled ? '' : '<p class="disabled-note">분석 기능이 꺼져 있어요. 초기화 후 다시 동의해주세요.</p>'}
+        ${settings.enabled ? '' : '<p class="disabled-note">분석 기능이 꺼져 있어요.<br />위쪽 스위치를 켜면 다시 사용할 수 있어요.</p>'}
       </div>
       <div id="analyze-result"></div>
     </div>
   `;
 
-  // 기사 제목/본문/출처는 외부 페이지에서 가져온 문자열이므로 innerHTML이 아닌 textContent로만 채운다.
+  // 외부 페이지에서 가져온 문자열이므로 항상 textContent로만 채운다 (innerHTML 금지).
   (app.querySelector('.article-title') as HTMLElement).textContent = result.title!;
   (app.querySelector('.article-preview') as HTMLElement).textContent = preview;
   if (hostname) {
@@ -154,7 +177,7 @@ function renderArticle(result: ExtractResult, settings: Settings, tabUrl: string
   document.querySelector('#analyze-btn')?.addEventListener('click', () => {
     handleAnalyze(result);
   });
-  bindResetButton();
+  bindHeaderControls();
 }
 
 function renderAnalyzing() {
@@ -168,12 +191,11 @@ function renderAnalyzing() {
 }
 
 // 분석 성공 결과를 카드로 렌더링. evidence/explanation은 API가 내려준 자유 텍스트라
-// 아래에서 별도로 textContent를 채워 넣어(innerHTML에 직접 넣지 않음) 이스케이프한다.
-// 근거(evidence/explanation)는 별도 "근거 보기" 버튼 없이 유사도 섹션 바로 아래에 항상 표시한다.
+// textContent로만 채운다. 근거는 별도 버튼 없이 유사도 섹션 바로 아래에 항상 표시한다.
 function renderAnalyzeResult(result: AnalyzeResult) {
   const resultBox = document.querySelector('#analyze-result')!;
-  // 등급/문구는 클라이언트가 다시 계산하지 않고 서버가 내려준 5단계 값을 그대로 쓴다.
-  const sigClass = `sig-${result.clickbaitSignalLevel}`;
+  // 등급은 클라이언트가 재계산하지 않고 서버가 내려준 5단계 값을 그대로 쓴다.
+  const sigClass = signalClass(result.clickbaitSignalLevel);
 
   // 5단계 게이지: 항상 5색을 모두 보여주되(안전→위험), 현재 단계만 진하게 강조하고
   // 그 아래 화살표+"현재" 라벨을 붙인다.
@@ -208,10 +230,10 @@ function renderAnalyzeResult(result: AnalyzeResult) {
               <span class="score-pill-dot"></span>
               <span class="score-pill-label"></span>
             </div>
-            <div class="score-sub">100점 기준 · 5단계 중 ${result.clickbaitSignalLevel}단계</div>
+            <div class="score-sub">${scoreSubLabel(result.clickbaitSignalLevel)}</div>
           </div>
         </div>
-        <div class="meter-track" role="img" aria-label="낚시성 신호 5단계 중 ${result.clickbaitSignalLevel}단계: ${result.clickbaitSignalLabel}">${meterSegments}</div>
+        <div class="meter-track" role="img" aria-label="${meterAriaLabel(result.clickbaitSignalLevel, result.clickbaitSignalLabel)}">${meterSegments}</div>
         <div class="meter-pointer-row">${meterPointers}</div>
         <div class="meter-scale">
           <span>안전</span>
@@ -225,7 +247,7 @@ function renderAnalyzeResult(result: AnalyzeResult) {
           <span class="similarity-pct">${result.titleBodySimilarity}%</span>
         </div>
         <div class="similarity-track">
-          <div class="similarity-fill" style="width: ${result.titleBodySimilarity}%"></div>
+          <div class="similarity-fill" style="width: ${clampPercent(result.titleBodySimilarity)}%"></div>
         </div>
       </div>
       <div class="card-section evidence-block">
@@ -234,7 +256,6 @@ function renderAnalyzeResult(result: AnalyzeResult) {
     </div>
   `;
 
-  // clickbaitSignalLabel은 서버(API)가 내려준 문자열이므로 innerHTML이 아닌 textContent로만 채운다.
   (resultBox.querySelector('.score-pill-label') as HTMLElement).textContent = result.clickbaitSignalLabel;
 
   const evidenceBlock = resultBox.querySelector('.evidence-block') as HTMLDivElement;
@@ -255,19 +276,17 @@ function renderAnalyzeResult(result: AnalyzeResult) {
     title.after(chips);
   }
 
-  // 근거 문구(해석 주의사항)는 유사도 섹션 바로 아래, 표현 칩 밑에 항상 표시한다.
   const explanation = document.createElement('p');
   explanation.className = 'explanation';
   explanation.textContent = result.explanation;
   evidenceBlock.insertBefore(explanation, evidenceBlock.querySelector('.mock-note'));
 
-  // 다시 분석할 수 있음을 알 수 있도록 상단 분석 버튼 라벨을 갱신한다.
+  // 다시 분석할 수 있음을 알 수 있도록 상단 버튼 라벨을 갱신한다.
   const analyzeBtn = document.querySelector('#analyze-btn');
   if (analyzeBtn) analyzeBtn.textContent = '다시 분석하기';
 }
 
-// 분석 실패 시 에러 문구 + 재시도 버튼. error.message는 background/analyzeApi가
-// 만든 안내 문구이지만 그대로 신뢰하지 않고 textContent로만 반영한다.
+// 분석 실패 시 에러 문구 + 재시도 버튼.
 function renderAnalyzeError(error: AnalyzeErrorInfo, article: ExtractResult) {
   const resultBox = document.querySelector('#analyze-result')!;
   resultBox.innerHTML = `
@@ -281,13 +300,17 @@ function renderAnalyzeError(error: AnalyzeErrorInfo, article: ExtractResult) {
   document.querySelector('#retry-btn')?.addEventListener('click', () => handleAnalyze(article));
 }
 
-// "분석하기" 버튼 클릭 시 실행. 실제 서버 호출은 content.ts와 똑같이 background에
-// chrome.runtime.sendMessage로 위임한다 (분석 로직을 팝업용으로 따로 복제하지 않음).
+// "분석하기" 클릭 시 실행. content.ts와 동일하게 서버 호출은 background에 위임한다.
 async function handleAnalyze(article: ExtractResult) {
+  // 이 호출이 속한 렌더링 세대를 기억해둔다. 응답을 기다리는 동안 초기화 등으로
+  // 팝업이 다시 그려지면(#analyze-result가 사라지면) 세대가 달라져 아래에서 걸러진다.
+  const generation = renderGeneration;
+
   renderAnalyzing();
 
-  // 버튼이 눌리는 시점 기준으로 한 번 더 확인 (팝업을 열어둔 채로 다른 곳에서 OFF했을 수도 있음).
+  // 클릭 시점 기준으로 한 번 더 확인 (팝업을 열어둔 채 다른 곳에서 OFF했을 수도 있음).
   const settings = await getSettings();
+  if (generation !== renderGeneration) return; // 기다리는 동안 팝업이 다시 그려짐 -> 무시
   const blockedReason = getAnalysisBlockedReason(settings);
   if (blockedReason) {
     renderAnalyzeError(blockedReason, article);
@@ -301,12 +324,15 @@ async function handleAnalyze(article: ExtractResult) {
       payload: { title: article.title!, body: article.body!, url: activeTab?.url ?? '' },
     });
 
+    if (generation !== renderGeneration) return; // 기다리는 동안 팝업이 다시 그려짐 -> 무시
+
     if (response.ok) {
       renderAnalyzeResult(response.result);
     } else {
       renderAnalyzeError(response.error, article);
     }
   } catch {
+    if (generation !== renderGeneration) return;
     renderAnalyzeError(
       { code: 'NETWORK_ERROR', message: '확장 프로그램 내부 통신에 실패했습니다.' },
       article,
@@ -314,9 +340,7 @@ async function handleAnalyze(article: ExtractResult) {
   }
 }
 
-// 구글 검색·구글 뉴스는 기사 목록·요약문이지 기사 본문이 아니므로 분석 대상에서 제외한다.
-// (실제로 이 도메인들엔 기사용 구조화 데이터가 없어 extractGenericArticle이 알아서
-// 거르지만, 애초에 "이 사이트 허용" 프롬프트조차 보여주지 않도록 명시적으로 막아둔다.)
+// 구글 검색·구글 뉴스는 기사 본문이 아니므로 "이 사이트 허용" 프롬프트조차 띄우지 않는다.
 const GENERIC_SUPPORT_EXCLUDED_HOSTNAMES = ['google.com', 'www.google.com', 'news.google.com'];
 
 function isExcludedFromGenericSupport(url: string): boolean {
@@ -327,9 +351,8 @@ function isExcludedFromGenericSupport(url: string): boolean {
   }
 }
 
-// requestSitePermission/injectContentScriptIntoTab이 실패했을 때 보여준다. 이 오류는
-// 팝업 자신의 콘솔(페이지가 아니라 팝업을 우클릭 → 검사)에만 찍혀서 놓치기 쉬우므로,
-// 화면에도 원인 문구를 그대로 보여준다.
+// requestSitePermission/injectContentScriptIntoTab 실패 시 보여준다.
+// 팝업 콘솔에만 찍히는 오류라 놓치기 쉬우므로 화면에도 원인 문구를 보여준다.
 function renderPermissionError(message: string, settings: Settings) {
   app.innerHTML = `
     ${header(settings)}
@@ -340,11 +363,11 @@ function renderPermissionError(message: string, settings: Settings) {
     </div>
   `;
   (app.querySelector('.error-text') as HTMLElement).textContent = message;
-  bindResetButton();
+  bindHeaderControls();
 }
 
 // "이 사이트 허용" 클릭 시 실행. 승인되면 지금 탭에 콘텐츠 스크립트를 바로 주입하고
-// (동적 등록은 다음 페이지 로드부터 적용되므로 새로고침 없이 쓰려면 필요) 처음부터 다시 그린다.
+// (동적 등록은 다음 페이지 로드부터 적용됨) 처음부터 다시 그린다.
 async function handleAllowSite(url: string, tabId: number, settings: Settings) {
   try {
     const granted = await requestSitePermission(url);
@@ -360,12 +383,9 @@ async function handleAllowSite(url: string, tabId: number, settings: Settings) {
   init();
 }
 
-// EXTRACT_ARTICLE을 보내보고, 응답이 없으면(콘텐츠 스크립트가 그 탭에 아직 없는 상태 —
-// 예: 이전에 사이트를 허용했을 때 registerContentScripts가 등록에는 실패했지만 권한
-// 자체는 남아있는 경우, 브라우저 재시작 등) 지금 탭에 스크립트를 직접 주입한 뒤 한 번만
-// 더 시도한다. 동시에 도메인 등록도 다시 시도해서, 이 탭뿐 아니라 이후 방문(그리고
-// 인라인 버튼)도 같이 복구되게 한다. 매번 이렇게 스스로 복구하도록 해서, "권한은
-// 있는데 스크립트는 없는" 상태에 계속 묶여있지 않게 한다.
+// EXTRACT_ARTICLE을 보내보고 응답이 없으면(콘텐츠 스크립트가 아직 없는 상태 —
+// 등록 실패, 브라우저 재시작 등) 스크립트를 직접 주입한 뒤 한 번만 더 시도한다.
+// 동시에 도메인 등록도 재시도해서 이후 방문/인라인 버튼까지 같이 복구되게 한다.
 async function extractFromTab(tabId: number, url: string): Promise<ExtractResult> {
   try {
     return await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_ARTICLE' });
@@ -379,9 +399,8 @@ async function extractFromTab(tabId: number, url: string): Promise<ExtractResult
   }
 }
 
-// 현재 활성 탭에 EXTRACT_ARTICLE 메시지를 보내 제목/본문을 가져온다 (content.ts의 기존 리스너 재사용).
-// 네이버·다음 외의 사이트는 사용자가 먼저 허용해야 콘텐츠 스크립트가 주입되므로,
-// 권한이 없으면 메시지를 보내기 전에 허용 화면부터 보여준다.
+// 활성 탭에 EXTRACT_ARTICLE을 보내 제목/본문을 가져온다 (content.ts의 리스너 재사용).
+// 네이버·다음 외 사이트는 권한이 없으면 메시지를 보내기 전에 허용 화면부터 보여준다.
 async function loadArticle(settings: Settings) {
   renderLoading(settings);
 
@@ -399,13 +418,16 @@ async function loadArticle(settings: Settings) {
 
   const result = await extractFromTab(tab.id, tab.url);
 
-  if (!result.isArticle) return renderNotArticle(settings);
+  // content.ts의 EXTRACT_ARTICLE 응답을 그대로 쓰므로, isArticle만 보고 title/body가
+  // 항상 있다고 가정하지 않는다 (content.ts의 클릭 핸들러와 같은 방어적 검사).
+  if (!result.isArticle || !result.title || !result.body) return renderNotArticle(settings);
   renderArticle(result, settings, tab.url);
 }
 
-// 팝업이 열릴 때마다(그리고 설정이 바뀔 때마다) 처음부터 다시 그린다.
-// 동의 전이면 동의 화면만, 동의 후면 헤더의 초기화 버튼 + 기사 카드를 같이 보여준다.
+// 팝업이 열릴 때마다 처음부터 다시 그린다. 동의 전이면 동의 화면만 보여준다.
 async function init() {
+  renderGeneration += 1; // 이전 렌더링에 걸려 있던 비동기 작업(handleAnalyze 등)을 모두 무효화
+
   const settings = await getSettings();
 
   if (!settings.consented) {

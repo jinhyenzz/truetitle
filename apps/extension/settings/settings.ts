@@ -1,14 +1,12 @@
 import type { AnalyzeErrorInfo, Settings } from '@/shared/types';
 
-// chrome.storage.local에 저장할 때 쓰는 키. 하나의 객체로 묶어서 저장한다.
+// chrome.storage.local에 하나의 객체로 묶어 저장할 때 쓰는 키.
 const STORAGE_KEY = 'trueTitleSettings';
 
-// 확장을 처음 설치했을 때의 기본값. 동의 전 + OFF 상태이므로 이 상태에서는
-// background가 어떤 분석 요청도 서버로 보내지 않는다.
+// 최초 설치 시 기본값. 동의 전 + OFF 상태라 background가 어떤 요청도 서버로 보내지 않는다.
 const DEFAULT_SETTINGS: Settings = { consented: false, enabled: false };
 
-// storage에서 읽어온 값은 타입이 unknown이라 그대로 믿지 않고,
-// boolean이 아닌 값(undefined, 다른 타입 등)이 섞여 있어도 항상 안전한 Settings로 맞춰준다.
+// storage 값은 타입이 unknown이라, boolean이 아닌 값이 섞여 있어도 안전한 Settings로 맞춘다.
 function normalize(value: unknown): Settings {
   const partial = (value ?? {}) as Partial<Settings>;
   return {
@@ -17,7 +15,7 @@ function normalize(value: unknown): Settings {
   };
 }
 
-// 현재 동의/ON-OFF 상태를 읽는다. 저장된 값이 없으면 기본값(둘 다 false)을 준다.
+// 현재 동의/ON-OFF 상태를 읽는다. 저장된 값이 없으면 기본값을 준다.
 export async function getSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(STORAGE_KEY);
   return normalize(stored[STORAGE_KEY]);
@@ -37,15 +35,13 @@ export async function resetSettings(): Promise<Settings> {
   return { ...DEFAULT_SETTINGS };
 }
 
-// 실제로 분석 요청을 진행해도 되는지 판단하는 단일 기준.
-// popup과 background 양쪽에서 이 함수 하나로만 판단해서 기준이 어긋나지 않게 한다.
+// 분석 요청을 진행해도 되는지 판단하는 단일 기준. popup/background가 공용으로 쓴다.
 export function isAnalysisAllowed(settings: Settings): boolean {
   return settings.consented && settings.enabled;
 }
 
-// 분석이 막혀 있다면 그 이유(code+안내 문구)를, 허용되면 null을 돌려준다.
-// isAnalysisAllowed와 같은 기준을 재사용하므로 popup과 background가 서로 다른
-// 문구/코드를 보여주는 일이 없다.
+// 분석이 막혀 있으면 이유(code+문구)를, 허용되면 null을 돌려준다.
+// isAnalysisAllowed와 기준을 공유해 popup/background가 다른 문구를 보여주지 않게 한다.
 export function getAnalysisBlockedReason(settings: Settings): AnalyzeErrorInfo | null {
   if (isAnalysisAllowed(settings)) return null;
   return {

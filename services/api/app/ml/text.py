@@ -4,6 +4,10 @@ from typing import Any
 
 DEFAULT_MAX_LENGTH = 128
 
+# 학습/비교/평가 스크립트가 저장하는 report·metrics.json에서 normalize_model_text의
+# 동작을 설명할 때 공통으로 쓰는 문구. 여기 한 곳만 바꾸면 세 스크립트의 설명이 같이 바뀐다.
+NORMALIZATION_DESCRIPTION = "residual double-quote escapes and whitespace in title and body"
+
 
 def normalize_model_text(value: str) -> str:
     """학습·추론에서 잔여 이스케이프와 연속 공백을 같은 방식으로 정리한다."""
