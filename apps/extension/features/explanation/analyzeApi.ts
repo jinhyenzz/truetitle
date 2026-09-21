@@ -5,9 +5,9 @@ import type {
   ClickbaitSignalLevel,
 } from '@/shared/types';
 
-// .env의 WXT_API_BASE_URL. 미설정(빈 문자열 포함) 시 로컬 개발 서버로 폴백.
+// .env의 WXT_API_BASE_URL. 미설정(빈 문자열 포함) 시 배포된 Railway API로 폴백.
 // wxt.config.ts의 readApiBaseUrl()과 같은 기준이어야 host_permissions와 어긋나지 않는다.
-const API_BASE_URL = import.meta.env.WXT_API_BASE_URL || 'http://127.0.0.1:8001';
+const API_BASE_URL = import.meta.env.WXT_API_BASE_URL || 'https://truetitle-production.up.railway.app';
 // 이 시간(ms) 안에 응답이 없으면 요청을 포기하고 TIMEOUT으로 처리한다.
 const REQUEST_TIMEOUT_MS = 15000;
 
