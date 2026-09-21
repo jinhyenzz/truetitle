@@ -43,6 +43,9 @@ htmlcov/
 *.safetensors
 
 # Local logs, browser profiles, backups, and editor state
+/AGENTS.md
+/docs/CODEX_CHANGELOG.md
+/docs/test.md
 *.log
 .codex-backups/
 tmp/
