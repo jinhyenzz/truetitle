@@ -400,3 +400,12 @@
 - 검증: 로컬 API 가상환경에서 `python -m unittest discover -s tests -p 'test_*.py' -v`를 실행해 36개 테스트가 모두 통과함. 실제 로컬 모델 가중치가 있는 상태에서 인용부호 변형·긴 제목 테스트도 통과함. `git diff --check`도 오류 없이 통과함. 로컬 가상환경에는 `pytest`가 설치되어 있지 않아 동일한 pytest 명령은 실행하지 못했으나, GitHub Actions는 `requirements-dev.txt`에서 pytest를 설치한 뒤 실행함.
 - 미검증: GitHub Actions 원격 재실행 결과는 사용자 커밋·push·PR 후 확인해야 함. Git commit·push·PR·병합은 수행하지 않음.
 - 원상복구: 별도 승인 후 위 백업본의 `test_main.py`와 이 변경 기록을 복원하면 수정 전 상태로 돌아갈 수 있음.
+## 2026-09-21 - Railway 배포 준비 설정 추가
+
+- 요청 및 승인: 사용자가 외부 서버 배포 방법을 확인한 뒤, 현재 구조를 점검하고 최소 배포 설정을 추가하는 작업을 승인함. 실제 Railway 계정 연결·공개 배포·비용 발생·Git commit/push는 이번 범위에 포함하지 않음.
+- 백업: 수정 전 `docs/CODEX_CHANGELOG.md`를 `.codex-backups/20260921-211500/docs/CODEX_CHANGELOG.md`에 원래 경로로 복사했고 SHA-256 `F49BC87014C364E3F1EE3BAE09D1BE0B4C70607A7F52AA27CD7CEF0612993828` 일치를 확인함. `Dockerfile`, `.dockerignore`, `railway.json`은 신규 파일이라 기존 백업 대상이 없음.
+- 수정 파일: 루트 `Dockerfile`은 Python 3.12 환경에서 API 의존성을 설치하고 `services/api`와 현재 실행 모델 `artifacts/transformer-10000-quote-normalized-v1`만 포함해 Railway가 제공하는 `PORT`로 Uvicorn을 실행하도록 추가함. `.dockerignore`는 원본 데이터·로컬 가상환경·확장프로그램 산출물·이전 모델을 이미지 빌드 문맥에서 제외하고 현재 모델만 포함하도록 추가함. `railway.json`은 `/ready`를 180초 동안 확인해 모델까지 준비된 배포만 정상으로 처리하도록 추가함.
+- 이유와 영향: 저장소 루트에 있는 모델과 하위 `services/api` 의존성 경로를 하나의 이미지에 명시적으로 묶어, 자동 감지에 따라 모델을 빠뜨리거나 잘못된 작업 경로로 실행되는 문제를 피함. API·모델 추론·확장프로그램 코드는 변경하지 않음. 배포 후 확장프로그램에는 Railway가 발급한 HTTPS 주소를 `WXT_API_BASE_URL`로 설정하고 재빌드해야 함.
+- 검증: `railway.json`을 Python JSON 파서로 읽어 유효함을 확인했고, `git diff --check`에서 오류는 없었음(변경기록 파일의 기존 LF/CRLF 경고만 출력됨). Docker CLI는 설치되어 있지만 Docker Desktop Linux 엔진이 꺼져 있어(`dockerDesktopLinuxEngine` 파이프 없음) 이미지 빌드와 컨테이너 `/ready` 검증은 실행할 수 없었음. API·모델 코드는 이번에 수정하지 않아 기존 API 테스트는 재실행하지 않음.
+- 미검증: Docker Desktop을 켠 뒤의 실제 이미지 빌드·컨테이너 `/ready` 응답, Railway의 Git LFS 체크아웃, 실제 클라우드 메모리·비용은 계정 연결 뒤에만 확인 가능함. AI Hub 데이터 및 학습 산출물의 외부 클라우드 사용 조건도 배포 전 최종 확인이 필요함.
+- 원상복구: 별도 승인 후 신규 `Dockerfile`, `.dockerignore`, `railway.json`을 제거하고 이 파일을 위 백업본으로 복원하면 배포 준비 전 상태로 돌아감. Git commit·push·원격 설정 변경은 수행하지 않음.

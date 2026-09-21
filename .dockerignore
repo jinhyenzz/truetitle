@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+node_modules
+apps/extension/node_modules
+apps/extension/.output
+data
+146.낚시성 기사 탐지 데이터
+.codex-backups
+artifacts/*
+!artifacts/transformer-10000-quote-normalized-v1/
+!artifacts/transformer-10000-quote-normalized-v1/**
+*.log
+.env
+.env.*
+!.env.example
