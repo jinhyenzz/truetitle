@@ -54,6 +54,8 @@ class ArticlePreparationTest(unittest.TestCase):
                     "id": "TEST_001",
                     "title": '기관 "변경 없다"',
                     "body": '기관은 "변경 없다"고 밝혔다.',
+                    "raw_title": r'기관 \\"변경 없다\\"',
+                    "raw_body": r'기관은 \\"변경 없다\\"고 밝혔다.',
                     "label": label,
                 }
                 self.assertEqual(article, expected)

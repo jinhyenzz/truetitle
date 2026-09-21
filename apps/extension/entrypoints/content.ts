@@ -5,24 +5,19 @@ import { findGenericTitleContainer } from '@/sites/generic';
 import { NAVER_ARTICLE_MATCH_PATTERN, findNaverTitleContainer, isNaverArticle } from '@/sites/naver';
 import type { AnalyzeErrorInfo, BackgroundResponseMessage, ExtractResult } from '@/shared/types';
 
-// 이 시간(ms) 동안만 제목이 늦게 렌더링되는지 지켜보고, 지나면 관찰을 포기한다.
-// (페이지 전체를 무한정 감시하지 않기 위함)
+// 제목이 늦게 렌더링되는 경우를 이 시간(ms)만 기다렸다가 관찰을 포기한다.
 const TITLE_WAIT_TIMEOUT_MS = 10000;
 
-// 지원 사이트 목록. match로 현재 URL이 이 사이트인지 판별하고,
-// findTitleContainer로 버튼을 붙일 기준 요소를 찾는다. 전용 어댑터가 있는 사이트를
-// 추가할 때는 이 배열과 features/detection/extractArticle.ts의 extractors, wxt.config.ts의
+// 지원 사이트 목록. match로 URL을, findTitleContainer로 버튼을 붙일 기준 요소를 찾는다.
+// 전용 어댑터 사이트 추가 시 여기와 extractArticle.ts의 extractors, wxt.config.ts의
 // host_permissions, 아래 defineContentScript의 matches를 함께 늘려야 한다.
-// (구글은 검색결과/뉴스 목록이 아니라 최종 도착한 언론사 페이지만 분석 대상이므로,
-// 이 목록에는 실제 기사를 호스팅하는 언론사 도메인만 넣고 google.com/news.google.com은 넣지 않는다.)
+// (구글 검색결과/뉴스 목록은 언론사 원문이 아니므로 제외 — 실제 도착 페이지만 대상)
 const SITES = [
   { match: isNaverArticle, findTitleContainer: findNaverTitleContainer },
   { match: isDaumArticle, findTitleContainer: findDaumTitleContainer },
-  // 전용 어댑터가 없는 그 외 언론사. 이 콘텐츠 스크립트는 정적 매치(네이버/다음) 또는
-  // 사용자가 features/permissions/sitePermissions.ts를 통해 직접 허용한 도메인에만
-  // 주입되므로, 여기 도달했다는 것 자체가 이미 허용된 사이트라는 뜻이다 (URL로 다시
-  // 가릴 필요가 없다). 실제 기사 여부는 findGenericTitleContainer/extractGenericArticle의
-  // 구조화 데이터 검사가 가린다.
+  // 전용 어댑터가 없는 그 외 언론사. 이 스크립트는 정적 매치(네이버/다음) 또는 사용자가
+  // 직접 허용한 도메인에만 주입되므로 여기 도달한 것 자체가 허용된 사이트라는 뜻이다.
+  // 실제 기사 여부는 findGenericTitleContainer/extractGenericArticle이 가린다.
   { match: () => true, findTitleContainer: findGenericTitleContainer },
 ];
 
@@ -30,9 +25,8 @@ const SITES = [
 function insertWidget(container: HTMLElement) {
   if (document.getElementById(WIDGET_ROOT_ID)) return; // 기사당 한 세트만 생성
 
-  // 클릭할 때마다 값을 올려서, "지금 화면에 보여줘야 할 응답이 어떤 요청의 것인지" 구분하는 용도.
-  // 로딩 중에도 패널의 ✕ 버튼으로 idle로 되돌아가 버튼이 다시 활성화될 수 있으므로(재시도 가능),
-  // 이전 요청의 응답이 늦게 도착해 더 최신 상태를 덮어쓰는 것을 막기 위해 필요하다.
+  // 클릭마다 증가시켜 "이 응답이 어느 요청 것인지" 구분한다. 로딩 중 ✕로 재시도가
+  // 가능하므로, 이전 요청의 늦은 응답이 최신 상태를 덮어쓰는 걸 막기 위해 필요하다.
   let requestToken = 0;
 
   const widget = createArticleWidget(() => {
@@ -43,10 +37,10 @@ function insertWidget(container: HTMLElement) {
   container.insertAdjacentElement('beforebegin', widget.root);
 
   async function handleAnalyzeClick() {
-    // 이 클릭 시점의 토큰을 기억해두고, 응답이 왔을 때 여전히 최신 요청인지 비교한다.
+    // 이 클릭의 토큰을 기억해두고, 응답이 왔을 때 여전히 최신 요청인지 비교한다.
     const token = ++requestToken;
 
-    // 클릭 시점에 항상 새로 추출한다 (버튼 노출 시점의 캐시된 값을 쓰지 않음).
+    // 클릭 시점에 항상 새로 추출한다 (캐시된 값을 쓰지 않음).
     const article: ExtractResult = extractCurrentArticle(location.href, document);
     if (!article.isArticle || !article.title || !article.body) {
       widget.setState({
@@ -60,8 +54,7 @@ function insertWidget(container: HTMLElement) {
 
     let response: BackgroundResponseMessage;
     try {
-      // 실제 서버 호출은 하지 않고, background service worker에 위임만 한다.
-      // background가 동의/ON-OFF 검증 + 고정된 /analyze 호출을 담당한다.
+      // 서버 호출은 background에 위임 (동의/ON-OFF 검증 + /analyze 호출을 거기서 담당).
       response = await chrome.runtime.sendMessage({
         type: 'ANALYZE_ARTICLE',
         payload: { title: article.title, body: article.body, url: location.href },
@@ -74,7 +67,7 @@ function insertWidget(container: HTMLElement) {
       response = { ok: false, error };
     }
 
-    if (token !== requestToken) return; // 이 응답을 기다리는 동안 더 최신 요청이 시작됨 -> 무시
+    if (token !== requestToken) return; // 기다리는 동안 더 최신 요청이 시작됨 -> 무시
 
     if (response.ok) {
       widget.setState({ kind: 'result', result: response.result });
@@ -89,8 +82,8 @@ function tryInsertWidget() {
   const site = SITES.find((candidate) => candidate.match(location.href));
   if (!site) return;
 
-  // 제목 컨테이너 + 실제 추출 가능 여부(본문 포함)까지 확인된 경우에만 true.
-  // 둘 다 확인해야 "엉뚱한 위치에 버튼만 덩그러니 삽입"되는 상황을 막을 수 있다.
+  // 제목 컨테이너 + 실제 추출 가능 여부(본문 포함) 둘 다 확인해야 엉뚱한 위치에
+  // 버튼만 삽입되는 걸 막을 수 있다.
   const insertIfReady = (): boolean => {
     const container = site.findTitleContainer(document);
     if (!container) return false;
@@ -102,9 +95,7 @@ function tryInsertWidget() {
   if (insertIfReady()) return; // 이미 렌더링되어 있으면 바로 삽입
 
   // 제목이 늦게 렌더링되는 경우를 대비해 제한 시간 동안만 DOM 변경을 감지한다.
-  // document.body 전체를 보긴 하지만, 찾으면 즉시 disconnect하고
-  // TITLE_WAIT_TIMEOUT_MS가 지나면 못 찾아도 강제로 disconnect해서
-  // 지원하지 않는 페이지에서 계속 감시하는 일이 없게 한다.
+  // 찾으면 즉시, TITLE_WAIT_TIMEOUT_MS가 지나면 못 찾아도 disconnect한다.
   const observer = new MutationObserver(() => {
     if (insertIfReady()) observer.disconnect();
   });
@@ -115,7 +106,7 @@ function tryInsertWidget() {
 export default defineContentScript({
   matches: [NAVER_ARTICLE_MATCH_PATTERN, DAUM_ARTICLE_MATCH_PATTERN],
   main() {
-    // 팝업이 "지금 탭의 기사 내용을 줘"라고 요청할 때 응답하는 기존 경로 (그대로 유지).
+    // 팝업이 "지금 탭의 기사 내용을 줘"라고 요청할 때 응답하는 경로.
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (msg.type !== 'EXTRACT_ARTICLE') return undefined; // 다른 메시지 타입은 처리하지 않음
       sendResponse(extractCurrentArticle(location.href, document));

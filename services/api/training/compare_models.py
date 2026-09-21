@@ -17,22 +17,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from training.data import ArticleExample, load_examples  # noqa: E402
 from training.metrics import calculate_metrics  # noqa: E402
-from app.ml.text import DEFAULT_MAX_LENGTH, tokenize_article  # noqa: E402
+from training.train_baseline import article_text  # noqa: E402
+from app.ml.text import DEFAULT_MAX_LENGTH, NORMALIZATION_DESCRIPTION, tokenize_article  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INPUT_DIR = PROJECT_ROOT / "data" / "processed" / "part1_body_disjoint"
 
 
-def predict_baseline(examples: list[ArticleExample], artifact_dir: Path) -> list[int]:
+def predict_baseline(examples: list[ArticleExample], artifact_dir: Path, input_mode: str) -> list[int]:
     from joblib import load
 
     model = load(artifact_dir / "tfidf_logistic_regression.joblib")
-    texts = [f"[제목] {example.title} [본문] {example.body}" for example in examples]
+    # train_baseline.py와 같은 article_text()를 써서, 여기서 만드는 입력 형식이 실제로
+    # 그 모델이 학습된 형식(--input-mode)과 항상 같게 유지한다. 형식이 어긋나면
+    # (예: title 모드로 학습한 모델에 title_body 텍스트를 넣으면) 평가 지표가 조용히 무의미해진다.
+    texts = [
+        article_text({"title": example.title, "body": example.body}, input_mode)
+        for example in examples
+    ]
     return model.predict(texts).tolist()
 
 
-def predict_transformer(examples: list[ArticleExample], artifact_dir: Path, batch_size: int) -> list[int]:
+def predict_transformer(
+    examples: list[ArticleExample],
+    artifact_dir: Path,
+    batch_size: int,
+    max_length: int = DEFAULT_MAX_LENGTH,
+) -> list[int]:
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -46,6 +58,7 @@ def predict_transformer(examples: list[ArticleExample], artifact_dir: Path, batc
                 tokenizer,
                 [example.title for example in batch],
                 [example.body for example in batch],
+                max_length=max_length,
                 padding=True,
             )
             predictions.extend(model(**encoded).logits.argmax(dim=1).tolist())
@@ -59,6 +72,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--samples", type=int, default=500)
     parser.add_argument("--baseline-artifact-dir", type=Path, default=PROJECT_ROOT / "artifacts" / "baseline-full")
     parser.add_argument("--transformer-artifact-dir", type=Path, default=PROJECT_ROOT / "artifacts" / "transformer-experiment-2000-v2")
+    # baseline 모델이 실제로 학습된 입력 형식과 반드시 일치해야 한다(train_baseline.py --input-mode).
+    parser.add_argument("--input-mode", choices=("title", "title_body"), default="title_body")
+    # transformer 모델이 실제로 학습된 길이와 반드시 일치해야 한다(train_transformer.py --max-length).
+    parser.add_argument("--max-length", type=int, default=DEFAULT_MAX_LENGTH)
     parser.add_argument("--report-path", type=Path, required=True)
     return parser.parse_args()
 
@@ -68,9 +85,11 @@ def main() -> None:
     examples = load_examples(args.input_dir / "part1_validation.jsonl", args.samples)
     labels = [example.label for example in examples]
     if args.model == "baseline":
-        predictions = predict_baseline(examples, args.baseline_artifact_dir)
+        predictions = predict_baseline(examples, args.baseline_artifact_dir, args.input_mode)
     else:
-        predictions = predict_transformer(examples, args.transformer_artifact_dir, batch_size=8)
+        predictions = predict_transformer(
+            examples, args.transformer_artifact_dir, batch_size=8, max_length=args.max_length
+        )
     metrics = calculate_metrics(labels, predictions)
     errors = [
         {"title": example.title, "actual": actual, "predicted": predicted}
@@ -84,12 +103,14 @@ def main() -> None:
         **metrics,
         "errors": errors[:20],
     }
-    if args.model == "transformer":
+    if args.model == "baseline":
+        report.update(input_mode=args.input_mode)
+    else:
         report.update(
             artifact_dir=str(args.transformer_artifact_dir.resolve()),
-            max_length=DEFAULT_MAX_LENGTH,
+            max_length=args.max_length,
             truncation="longest_first",
-            normalization="residual double-quote escapes and whitespace in title and body",
+            normalization=NORMALIZATION_DESCRIPTION,
         )
     args.report_path.parent.mkdir(parents=True, exist_ok=True)
     args.report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

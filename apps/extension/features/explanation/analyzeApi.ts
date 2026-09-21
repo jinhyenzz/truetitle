@@ -5,15 +5,13 @@ import type {
   ClickbaitSignalLevel,
 } from '@/shared/types';
 
-// .env의 WXT_API_BASE_URL로 설정. 없거나 빈 문자열이면 로컬 개발 서버로 기본값 사용.
-// wxt.config.ts의 readApiBaseUrl()과 동일하게 빈 문자열도 "미설정"으로 취급해야
-// host_permissions와 실제 fetch 대상이 어긋나지 않는다.
+// .env의 WXT_API_BASE_URL. 미설정(빈 문자열 포함) 시 로컬 개발 서버로 폴백.
+// wxt.config.ts의 readApiBaseUrl()과 같은 기준이어야 host_permissions와 어긋나지 않는다.
 const API_BASE_URL = import.meta.env.WXT_API_BASE_URL || 'http://127.0.0.1:8001';
-// 이 시간(ms) 안에 서버가 응답 안 하면 요청을 포기하고 TIMEOUT 에러로 취급한다.
+// 이 시간(ms) 안에 응답이 없으면 요청을 포기하고 TIMEOUT으로 처리한다.
 const REQUEST_TIMEOUT_MS = 15000;
 
-// 실패 원인을 code로 구분해서 던지는 커스텀 에러.
-// 호출하는 쪽(background)이 이 code를 그대로 AnalyzeErrorInfo에 담아 UI에 전달한다.
+// 실패 원인을 code로 구분해서 던지는 커스텀 에러. background가 code를 그대로 UI에 전달한다.
 export class AnalyzeApiError extends Error {
   code: AnalyzeErrorCode;
 
@@ -24,8 +22,7 @@ export class AnalyzeApiError extends Error {
   }
 }
 
-// 서버(/analyze)가 실제로 내려주는 응답 스키마 (snake_case). services/api 쪽 계약과 동일해야 한다.
-// clickbait_signal_level/label은 5단계 표시용으로 새로 추가된 필드 (기존 필드는 그대로 유지됨).
+// 서버(/analyze) 응답 스키마 (snake_case). services/api 계약과 동일해야 한다.
 interface AnalyzeApiResponse {
   clickbait_score: number;
   clickbait_signal_level: ClickbaitSignalLevel;
@@ -36,10 +33,9 @@ interface AnalyzeApiResponse {
   note: string;
 }
 
-// 분석 서버에 title/body만 보내고 결과를 받아온다.
-// popup과 background(content script용) 양쪽이 이 함수 하나만 재사용한다.
+// 분석 서버에 title/body만 보내고 결과를 받아온다. popup과 background가 공용으로 쓴다.
 export async function analyzeArticle(req: AnalyzeRequest): Promise<AnalyzeResult> {
-  // AbortController로 REQUEST_TIMEOUT_MS가 지나면 강제로 fetch를 취소시킨다.
+  // REQUEST_TIMEOUT_MS가 지나면 AbortController로 fetch를 강제 취소한다.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -52,7 +48,7 @@ export async function analyzeArticle(req: AnalyzeRequest): Promise<AnalyzeResult
       signal: controller.signal,
     });
   } catch (e) {
-    // AbortError면 타임아웃, 그 외(fetch 자체 실패)는 서버가 꺼져있는 등 네트워크 문제.
+    // AbortError는 타임아웃, 그 외는 서버 다운 등 네트워크 문제.
     if (e instanceof DOMException && e.name === 'AbortError') {
       throw new AnalyzeApiError('TIMEOUT', '분석 서버 응답이 시간 내에 오지 않았습니다.');
     }
@@ -62,12 +58,20 @@ export async function analyzeArticle(req: AnalyzeRequest): Promise<AnalyzeResult
   }
 
   if (!response.ok) {
-    // services/api/app/api/analyze.py 기준: 모델 준비 안 됨=503, 입력값 검증 실패=422
+    // services/api/app/api/analyze.py 기준: 모델 준비 안 됨=503, 입력값 검증 실패=422,
+    // 요청 과다=429(Retry-After 헤더에 재시도까지 남은 초를 담아 보냄)
     if (response.status === 503) {
       throw new AnalyzeApiError('MODEL_UNAVAILABLE', '분석 모델을 준비하지 못했습니다.');
     }
     if (response.status === 422) {
       throw new AnalyzeApiError('INVALID_INPUT', '제목 또는 본문을 확인할 수 없습니다.');
+    }
+    if (response.status === 429) {
+      const retryAfterSeconds = Number(response.headers.get('Retry-After'));
+      const waitMessage = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? `${retryAfterSeconds}초 후 다시 시도해주세요.`
+        : '잠시 후 다시 시도해주세요.';
+      throw new AnalyzeApiError('RATE_LIMITED', `요청이 너무 많습니다. ${waitMessage}`);
     }
     throw new AnalyzeApiError('UNKNOWN', `분석 서버 오류: ${response.status}`);
   }

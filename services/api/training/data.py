@@ -21,6 +21,10 @@ class ArticleExample:
     title: str
     body: str
     label: int
+    # 정규화(normalize_model_text) 이전 원문. prepare_part1.py가 생성한 JSONL에만 있고,
+    # evaluate_quote_normalization.py가 정규화 전/후를 비교할 때만 쓴다. 없으면 None.
+    raw_title: str | None = None
+    raw_body: str | None = None
 
 
 def load_examples(path: Path, limit: int | None) -> list[ArticleExample]:
@@ -42,12 +46,16 @@ def load_examples(path: Path, limit: int | None) -> list[ArticleExample]:
             title = article.get("title")
             body = article.get("body")
             label = article.get("label")
+            raw_title = article.get("raw_title")
+            raw_body = article.get("raw_body")
             if not isinstance(title, str) or not title.strip() or not isinstance(body, str) or not body.strip():
                 raise ValueError(f"{path.name}:{line_number} 제목 또는 본문 형식이 올바르지 않습니다.")
             if type(label) is not int or label not in LABEL_NAMES:
                 raise ValueError(f"{path.name}:{line_number} 라벨이 올바르지 않습니다: {label!r}")
 
-            example = ArticleExample(title=title, body=body, label=label)
+            example = ArticleExample(
+                title=title, body=body, label=label, raw_title=raw_title, raw_body=raw_body
+            )
             counts[label] += 1
             if quotas is None:
                 examples.append(example)

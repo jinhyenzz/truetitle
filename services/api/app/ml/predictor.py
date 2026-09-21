@@ -146,6 +146,10 @@ def analyze_article(
     title: str, body: str
 ) -> tuple[float, Literal["clickbait", "non_clickbait"], float, list[str]]:
     score = predict_clickbait_score(title, body)
-    classification = "clickbait" if score >= 50 else "non_clickbait"
+    # classification이 score_to_signal_level과 다른 기준(50점)으로 갈리면, 같은 응답 안에서
+    # 예를 들어 55점이 "clickbait"이면서 동시에 5단계 신호로는 "확인 권장"(레벨 3, 중립)으로
+    # 나오는 모순이 생긴다. 두 필드가 항상 같은 경계를 쓰도록 signal_level에서 파생시킨다.
+    signal_level, _ = score_to_signal_level(score)
+    classification = "clickbait" if signal_level >= 4 else "non_clickbait"
     similarity = calculate_title_body_similarity(title, body)
     return score, classification, similarity, find_title_terms_not_in_body(title, body)

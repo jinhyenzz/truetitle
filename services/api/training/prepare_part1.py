@@ -31,8 +31,10 @@ def build_article(raw: dict[str, Any]) -> dict[str, Any]:
     labeled = raw["labeledDataInfo"]
 
     article_id = source["newsID"]
-    title = normalize_text(labeled["newTitle"])
-    body = normalize_text(source["newsContent"])
+    raw_title = labeled["newTitle"]
+    raw_body = source["newsContent"]
+    title = normalize_text(raw_title)
+    body = normalize_text(raw_body)
     label = labeled["clickbaitClass"]
 
     if not isinstance(article_id, str) or not article_id:
@@ -48,6 +50,11 @@ def build_article(raw: dict[str, Any]) -> dict[str, Any]:
         "id": article_id,
         "title": title,
         "body": body,
+        # 정규화 이전 원문. evaluate_quote_normalization.py가 정규화 전/후 예측을
+        # 비교하려면 실제 "정규화 전" 텍스트가 필요한데, title/body는 이미 정규화된
+        # 값이라 그 자체로는 비교 기준이 될 수 없다.
+        "raw_title": raw_title,
+        "raw_body": raw_body,
         "label": label,
     }
 

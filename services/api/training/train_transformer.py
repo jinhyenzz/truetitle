@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from training.data import ArticleExample, LABEL_NAMES, load_examples  # noqa: E402
 from training.metrics import calculate_metrics  # noqa: E402
-from app.ml.text import DEFAULT_MAX_LENGTH, tokenize_article  # noqa: E402
+from app.ml.text import DEFAULT_MAX_LENGTH, NORMALIZATION_DESCRIPTION, tokenize_article  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -174,7 +174,7 @@ def main() -> None:
         "model": args.model_name,
         "input": "가공 제목(newTitle)과 본문(newsContent)을 쌍으로 입력",
         "truncation": "longest_first: 제목·본문 중 긴 입력부터 max_length까지 절단",
-        "normalization": "residual double-quote escapes and whitespace in title and body",
+        "normalization": NORMALIZATION_DESCRIPTION,
         "label_meaning": {str(key): value for key, value in LABEL_NAMES.items()},
         "train_samples": len(train_examples),
         "validation_samples": len(validation_examples),

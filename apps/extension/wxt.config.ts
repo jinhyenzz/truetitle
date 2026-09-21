@@ -26,4 +26,9 @@ export default defineConfig({
     // 모든 사이트를 처음부터 열어주지 않기 위한 선택 권한 선언.
     optional_host_permissions: ['https://*/*'],
   },
+  // wxt dev 실행 시 about:blank 브라우저 창이 자동으로 뜨는 걸 막는다.
+  // 확장 프로그램은 chrome://extensions에서 .output/chrome-mv3-dev를 직접 "압축해제된 확장 프로그램 로드"로 불러와야 한다.
+  webExt: {
+    disabled: true,
+  },
 });
