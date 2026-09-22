@@ -29,6 +29,9 @@ class ModelUnavailableError(RuntimeError):
 @lru_cache
 def load_model():
     try:
+        # 배포 CPU 한도는 2코어지만 호스트의 48코어가 보일 수 있다.
+        # 자동 스레드 수로 인한 CPU 경쟁을 막도록 모델 로딩 전에 제한한다.
+        torch.set_num_threads(2)
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
         model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH).eval()
         # 모델 config의 label2id에서 "clickbait" 인덱스를 직접 조회한다.

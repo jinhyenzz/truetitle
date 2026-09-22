@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import torch
 
@@ -8,6 +8,7 @@ from app.ml.predictor import (
     analyze_article,
     calculate_title_body_similarity,
     find_title_terms_not_in_body,
+    load_model,
     predict_clickbait_score,
     score_to_signal_level,
 )
@@ -56,6 +57,20 @@ class ModelTextNormalizationTest(unittest.TestCase):
 
 
 class ModelPredictionTest(unittest.TestCase):
+    def test_limits_cpu_threads_before_loading_model(self):
+        calls = Mock()
+        calls.model.return_value.eval.return_value.config.label2id = {"clickbait": 0}
+        with (
+            patch("app.ml.predictor.torch.set_num_threads", calls.set_threads),
+            patch("app.ml.predictor.AutoTokenizer.from_pretrained", calls.tokenizer),
+            patch("app.ml.predictor.AutoModelForSequenceClassification.from_pretrained", calls.model),
+        ):
+            # 캐시된 실제 모델은 유지하고, 최초 로딩 경로만 검사한다.
+            load_model.__wrapped__()
+
+        self.assertEqual(calls.mock_calls[0], call.set_threads(2))
+        calls.set_threads.assert_called_once_with(2)
+
     def test_uses_model_configured_clickbait_index(self):
         tokenizer = Mock(
             return_value={
